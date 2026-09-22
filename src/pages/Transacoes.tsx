@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search, SlidersHorizontal, ArrowUp, ArrowDown, Pencil, Trash2 } from 'lucide-react'
 import { Topbar } from '@/components/Topbar'
 import { PageBody } from '@/components/PageBody'
@@ -23,6 +23,10 @@ export default function Transacoes({ filtroInicial }: { filtroInicial: Filtro })
   const toast = useToast()
 
   const [filtro, setFiltro] = useState<Filtro>(filtroInicial)
+
+  useEffect(() => {
+    setFiltro(filtroInicial)
+  }, [filtroInicial])
   const [busca, setBusca] = useState('')
   const [categoria, setCategoria] = useState('')
   const [mostraFiltros, setMostraFiltros] = useState(false)
