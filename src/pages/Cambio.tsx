@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowDownUp, Bell, TrendingUp, TrendingDown } from 'lucide-react'
 import { Topbar } from '@/components/Topbar'
 import { PageBody } from '@/components/PageBody'
@@ -15,11 +15,18 @@ import { cn } from '@/lib/cn'
 const MONITORADAS = ['USD', 'EUR', 'GBP', 'JPY', 'CAD']
 
 export default function Cambio() {
-  const { rates, receitas, despesas } = useData()
+  const { rates, receitas, despesas, refreshRates } = useData()
   const [de, setDe] = useState('BRL')
   const [para, setPara] = useState('USD')
   const [valorStr, setValorStr] = useState(() => formatNumber(1000))
   const [alerta, setAlerta] = useState(() => localStorage.getItem('mc_alerta_usd') === '1')
+
+  // Sempre que a tela de Câmbio é aberta, busca a cotação mais recente
+  // (ignorando o cache de 30min usado no resto do app).
+  useEffect(() => {
+    refreshRates()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const valor = parseMoney(valorStr)
   const recebe = convert(valor, de, para, rates)
@@ -146,7 +153,12 @@ export default function Cambio() {
                 const c = getCurrency(code)
                 const pct = r?.pct ?? 0
                 return (
-                  <div key={code} className="flex items-center gap-3 border-b border-line py-3 last:border-0">
+                  <button
+                    key={code}
+                    onClick={() => { setDe('BRL'); setPara(code) }}
+                    title={`Converter BRL → ${code}`}
+                    className="flex w-full items-center gap-3 border-b border-line py-3 text-left transition last:border-0 hover:bg-subtle"
+                  >
                     <CurrencyChip code={code} />
                     <div className="min-w-0 flex-1">
                       <div className="text-[14px] font-semibold text-text-1">{c.name}</div>
@@ -166,7 +178,7 @@ export default function Cambio() {
                         {Math.abs(pct).toFixed(1)}%
                       </div>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>

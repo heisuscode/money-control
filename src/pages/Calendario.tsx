@@ -20,12 +20,18 @@ import { useData } from '@/contexts/DataContext'
 import { useNovaTransacao } from '@/components/AppLayout'
 import { formatCurrency, parseDate } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import { useFinanceiro } from '@/financeiro/FinanceiroContext'
+import { PagarContaModal, isVirtual, type ContaPagavel } from '@/financeiro/PagarContaModal'
 
 export default function Calendario() {
   const { receitas, despesas, contas } = useData()
+  const { contasVirtuais } = useFinanceiro()
   const { open } = useNovaTransacao()
   const [cursor, setCursor] = useState(new Date())
   const [selecionado, setSelecionado] = useState(new Date())
+  const [pagarConta, setPagarConta] = useState<ContaPagavel | null>(null)
+
+  const todasContas = useMemo<ContaPagavel[]>(() => [...contas, ...contasVirtuais], [contas, contasVirtuais])
 
   const dias = useMemo(() => {
     const ini = startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 })
@@ -36,14 +42,24 @@ export default function Calendario() {
   function eventosDoDia(d: Date) {
     const rec = receitas.filter((r) => isSameDay(parseDate(r.data), d))
     const des = despesas.filter((r) => isSameDay(parseDate(r.data), d))
-    const cts = contas.filter((c) => isSameDay(parseDate(c.vencimento), d))
+    const cts = todasContas.filter((c) => isSameDay(parseDate(c.vencimento), d))
     return { rec, des, cts }
   }
 
   const selEventos = eventosDoDia(selecionado)
+  // Fatura só agrupa compras que já aparecem no dia em que foram feitas: não soma de novo.
   const totalDia =
-    selEventos.cts.reduce((a, c) => a + Number(c.valor), 0) +
-    selEventos.des.reduce((a, c) => a + Number(c.valor), 0)
+    selEventos.cts
+      .filter((c) => c.status !== 'pago' && !(isVirtual(c) && c.origem === 'fatura'))
+      .reduce((a, c) => a + Number(c.valor), 0) + selEventos.des.reduce((a, c) => a + Number(c.valor), 0)
+
+  function subConta(c: ContaPagavel) {
+    if (c.status === 'pago') return 'Já paga'
+    if (isVirtual(c) && c.origem === 'recorrencia') return 'Recorrente · toque para ver'
+    if (isVirtual(c) && c.faturaAberta) return 'Fatura em aberto · ainda recebe compras'
+    if (isVirtual(c) && c.origem === 'fatura') return 'Fatura do cartão · toque para pagar'
+    return 'Vencimento · toque para pagar'
+  }
 
   const semana = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
 
@@ -138,7 +154,14 @@ export default function Calendario() {
               ) : (
                 <>
                   {selEventos.cts.map((c) => (
-                    <Linha key={c.id} cor="danger" titulo={c.descricao} sub="Vencimento" valor={c.valor} />
+                    <Linha
+                      key={c.id}
+                      cor="danger"
+                      titulo={c.descricao}
+                      sub={subConta(c)}
+                      valor={c.valor}
+                      onClick={c.status !== 'pago' ? () => setPagarConta(c) : undefined}
+                    />
                   ))}
                   {selEventos.des.map((m) => (
                     <Linha key={m.id} cor="danger" titulo={m.descricao} sub={m.categoria?.nome ?? 'Despesa'} valor={m.valor} />
@@ -157,6 +180,8 @@ export default function Calendario() {
           </Card>
         </div>
       </PageBody>
+
+      <PagarContaModal conta={pagarConta} onClose={() => setPagarConta(null)} />
     </>
   )
 }
@@ -167,15 +192,25 @@ function Linha({
   sub,
   valor,
   positivo,
+  onClick,
 }: {
   cor: 'danger' | 'success'
   titulo: string
   sub: string
   valor: number
   positivo?: boolean
+  onClick?: () => void
 }) {
+  const Comp = onClick ? 'button' : 'div'
   return (
-    <div className={cn('flex items-center gap-3 rounded-xl border-l-[3px] bg-subtle/60 px-3 py-2.5', cor === 'danger' ? 'border-danger' : 'border-success')}>
+    <Comp
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-center gap-3 rounded-xl border-l-[3px] bg-subtle/60 px-3 py-2.5 text-left',
+        cor === 'danger' ? 'border-danger' : 'border-success',
+        onClick && 'transition hover:bg-subtle',
+      )}
+    >
       <div className="min-w-0 flex-1">
         <div className="truncate text-[13px] font-semibold text-text-1">{titulo}</div>
         <div className="text-[11px] text-text-3">{sub}</div>
@@ -184,6 +219,6 @@ function Linha({
         {positivo ? '+ ' : ''}
         {formatCurrency(valor)}
       </span>
-    </div>
+    </Comp>
   )
 }

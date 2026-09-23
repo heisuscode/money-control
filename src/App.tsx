@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { SidebarProvider } from './contexts/SidebarContext'
 import { DataProvider } from './contexts/DataContext'
+import { FinanceiroProvider } from './financeiro/FinanceiroContext'
 import { AppLayout } from './components/AppLayout'
 import { Spinner } from './components/ui'
 import { type ReactNode } from 'react'
@@ -19,6 +20,8 @@ import Cambio from './pages/Cambio'
 import Notificacoes from './pages/Notificacoes'
 import Configuracoes from './pages/Configuracoes'
 import Categorias from './pages/Categorias'
+import CarteirasPage from './financeiro/CarteirasPage'
+import RecorrenciasPage from './financeiro/RecorrenciasPage'
 
 function FullScreenLoader() {
   return (
@@ -71,7 +74,9 @@ export default function App() {
           <Protected>
             <SidebarProvider>
               <DataProvider>
-                <AppLayout />
+                <FinanceiroProvider>
+                  <AppLayout />
+                </FinanceiroProvider>
               </DataProvider>
             </SidebarProvider>
           </Protected>
@@ -89,6 +94,8 @@ export default function App() {
         <Route path="/notificacoes" element={<Notificacoes />} />
         <Route path="/configuracoes" element={<Configuracoes />} />
         <Route path="/categorias" element={<Categorias />} />
+        <Route path="/carteiras" element={<CarteirasPage />} />
+        <Route path="/recorrencias" element={<RecorrenciasPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

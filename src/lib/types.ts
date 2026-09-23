@@ -41,6 +41,70 @@ export interface Movimentacao {
   categoria?: Categoria | null
   // marcação local
   tipo?: TipoCategoria
+  // de onde saiu/entrou o dinheiro e, se gerada automaticamente, qual recorrência
+  carteira_id?: string | null
+  recorrencia_id?: string | null
+}
+
+export type TipoCarteira = 'conta' | 'dinheiro' | 'cartao_credito'
+
+export interface Carteira {
+  id: string
+  usuario_id: string
+  nome: string
+  tipo: TipoCarteira
+  cor: string
+  icone: string
+  saldo_inicial: number
+  /** só cartão de crédito */
+  limite: number | null
+  dia_fechamento: number | null
+  dia_vencimento: number | null
+  criado_em: string
+}
+
+export type FrequenciaRecorrencia = 'semanal' | 'mensal' | 'anual'
+
+export interface Recorrencia {
+  id: string
+  usuario_id: string
+  ativo: boolean
+  tipo: TipoCategoria
+  descricao: string
+  valor: number
+  categoria_id: string | null
+  carteira_id: string | null
+  frequencia: FrequenciaRecorrencia
+  /** dia do mês (mensal/anual) ou dia da semana 0-6 (semanal) */
+  dia: number
+  data_inicio: string
+  /** última ocorrência já lançada como receita/despesa */
+  ultima_execucao: string | null
+  criado_em: string
+}
+
+/** Pagamento de fatura: transferência da conta pagadora para o cartão (não é despesa). */
+export interface PagamentoFatura {
+  id: string
+  usuario_id: string
+  cartao_id: string
+  fim_ciclo: string
+  carteira_id: string | null
+  valor: number
+  data: string
+  criado_em: string
+}
+
+/** Conta a pagar calculada (fatura de cartão ou próxima ocorrência de recorrência). */
+export type ContaVirtual = Conta & {
+  virtual: true
+  origem: 'fatura' | 'recorrencia'
+  cartaoId?: string
+  fimCiclo?: string
+  /** fatura do ciclo atual: ainda recebe compras, só pode ser paga depois de fechar */
+  faturaAberta?: boolean
+  fechaEm?: string
+  recorrenciaId?: string
 }
 
 export interface Conta {

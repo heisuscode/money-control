@@ -14,11 +14,13 @@ import { sum, inMonth } from '@/lib/finance'
 import { getCurrency } from '@/lib/currencies'
 import type { Movimentacao } from '@/lib/types'
 import { cn } from '@/lib/cn'
+import { useFinanceiro } from '@/financeiro/FinanceiroContext'
 
 type Filtro = 'todas' | 'receitas' | 'despesas'
 
 export default function Transacoes({ filtroInicial }: { filtroInicial: Filtro }) {
   const { receitas, despesas, categorias, loading, error, reload, refreshAll } = useData()
+  const { carteiras } = useFinanceiro()
   const { open } = useNovaTransacao()
   const toast = useToast()
 
@@ -177,7 +179,15 @@ export default function Transacoes({ filtroInicial }: { filtroInicial: Filtro })
                             {m.categoria?.icone ?? (m.tipo === 'receita' ? '💰' : '💳')}
                           </span>
                           <div>
-                            <div className="text-[14px] font-semibold text-text-1">{m.descricao}</div>
+                            <div className="flex items-center gap-1.5 text-[14px] font-semibold text-text-1">
+                              {m.descricao}
+                              {m.recorrencia_id && <span className="text-[12px]" title="Lançado por recorrência">🔁</span>}
+                            </div>
+                            {m.carteira_id && (
+                              <div className="text-[11px] text-text-3">
+                                {carteiras.find((c) => c.id === m.carteira_id)?.nome ?? 'Carteira removida'}
+                              </div>
+                            )}
                             {m.moeda_original !== 'BRL' && (
                               <div className="num text-[11px] text-text-3">
                                 {getCurrency(m.moeda_original).symbol} {formatNumber(m.valor_original)}{' '}

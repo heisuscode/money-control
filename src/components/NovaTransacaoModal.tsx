@@ -5,13 +5,14 @@ import { Button, Field, Input, Select } from './ui'
 import { CurrencyChip } from './CurrencyChip'
 import { CURRENCIES, getCurrency } from '@/lib/currencies'
 import { convert } from '@/lib/exchange'
-import { formatCurrency, formatNumber, maskMoneyInput, parseMoney, todayISO } from '@/lib/format'
+import { formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney, todayISO } from '@/lib/format'
 import { useData } from '@/contexts/DataContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { useToast } from './ui/Toast'
-import type { Movimentacao, TipoCategoria } from '@/lib/types'
+import type { FrequenciaRecorrencia, Movimentacao, TipoCategoria } from '@/lib/types'
 import { cn } from '@/lib/cn'
+import { useFinanceiro } from '@/financeiro/FinanceiroContext'
 
 interface Props {
   open: boolean
@@ -24,16 +25,20 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
   const { rates, categorias, reload } = useData()
   const { user } = useAuth()
   const toast = useToast()
+  const { carteiras, salvarRecorrencia, removerRecorrencia } = useFinanceiro()
 
   const [tipo, setTipo] = useState<TipoCategoria>(tipoInicial)
   const [valorStr, setValorStr] = useState('')
   const [moeda, setMoeda] = useState('BRL')
   const [descricao, setDescricao] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
+  const [carteiraId, setCarteiraId] = useState('')
   const [data, setData] = useState(todayISO())
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [recorrente, setRecorrente] = useState(false)
+  const [frequenciaRec, setFrequenciaRec] = useState<FrequenciaRecorrencia>('mensal')
 
   // Reinicia / carrega valores ao abrir
   useEffect(() => {
@@ -45,18 +50,36 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
       setDescricao(editar.descricao)
       setCategoriaId(editar.categoria_id ?? '')
       setData(editar.data)
+      setCarteiraId(editar.carteira_id ?? '')
     } else {
       setTipo(tipoInicial)
       setValorStr('')
       setMoeda('BRL')
       setDescricao('')
       setCategoriaId('')
+      setCarteiraId('')
       setData(todayISO())
     }
+    setRecorrente(false)
+    setFrequenciaRec('mensal')
     setErro(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editar, tipoInicial])
 
   const cats = useMemo(() => categorias.filter((c) => c.tipo === tipo), [categorias, tipo])
+  const carteiraSelecionada = carteiras.find((c) => c.id === carteiraId)
+  const isCartaoCredito = carteiraSelecionada?.tipo === 'cartao_credito'
+  const carteirasDisponiveis = tipo === 'receita' ? carteiras.filter((c) => c.tipo !== 'cartao_credito') : carteiras
+
+  useEffect(() => {
+    if (tipo === 'receita' && isCartaoCredito) setCarteiraId('')
+  }, [tipo, isCartaoCredito])
+
+  // Despesa recorrente num cartão de crédito não tem "próximo vencimento"
+  // próprio — ela entra na fatura e o vencimento é o do cartão.
+  useEffect(() => {
+    if (isCartaoCredito) setFrequenciaRec('mensal')
+  }, [isCartaoCredito])
 
   const valorNum = parseMoney(valorStr)
   // taxa registrada = BRL por 1 unidade da moeda escolhida (RN07)
@@ -78,22 +101,46 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
     setLoading(true)
     try {
       const tabela = tipo === 'receita' ? 'receitas' : 'despesas'
+      const valorBRL = Number(convertido.toFixed(2))
       const registro = {
         usuario_id: user.id,
         descricao: descricao.trim(),
-        valor: Number(convertido.toFixed(2)),
-        valor_convertido: Number(convertido.toFixed(2)),
+        valor: valorBRL,
+        valor_convertido: valorBRL,
         valor_original: Number(valorNum.toFixed(2)),
         moeda_original: moeda,
         taxa: Number(taxa.toFixed(6)),
         taxa_timestamp: rates[moeda]?.timestamp ?? new Date().toISOString(),
         data,
         categoria_id: categoriaId || null,
+        carteira_id: carteiraId || null,
       }
       if (editar) {
         const { error } = await supabase.from(tabela).update(registro).eq('id', editar.id)
         if (error) throw error
         toast('success', 'Transação atualizada.')
+      } else if (recorrente) {
+        // A recorrência nasce já "executada" nesta data: este lançamento é a 1ª
+        // ocorrência (vinculada a ela) e as próximas são geradas automaticamente.
+        const d = new Date(`${data}T00:00:00`)
+        const rec = await salvarRecorrencia({
+          ativo: true,
+          tipo,
+          descricao: descricao.trim(),
+          valor: valorBRL,
+          categoria_id: categoriaId || null,
+          carteira_id: carteiraId || null,
+          frequencia: frequenciaRec,
+          dia: frequenciaRec === 'semanal' ? d.getDay() : d.getDate(),
+          data_inicio: data,
+          ultima_execucao: data,
+        })
+        const { error } = await supabase.from(tabela).insert({ ...registro, recorrencia_id: rec.id })
+        if (error) {
+          await removerRecorrencia(rec.id).catch(() => {})
+          throw error
+        }
+        toast('success', tipo === 'receita' ? 'Receita recorrente criada.' : 'Despesa recorrente criada.')
       } else {
         const { error } = await supabase.from(tabela).insert(registro)
         if (error) throw error
@@ -254,6 +301,59 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
             </div>
           </Field>
         </div>
+
+        <Field
+          label={tipo === 'receita' ? 'Recebido em (opcional)' : 'Pago com (opcional)'}
+          hint={isCartaoCredito ? 'Entra na fatura do cartão e desconta do limite.' : undefined}
+        >
+          <Select value={carteiraId} onChange={(e) => setCarteiraId(e.target.value)}>
+            <option value="">Sem carteira</option>
+            {carteirasDisponiveis.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.icone} {c.nome}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        {!editar && (
+          <div className="rounded-xl border border-line p-3">
+            <label className="flex cursor-pointer items-center gap-2.5">
+              <input
+                type="checkbox"
+                checked={recorrente}
+                onChange={(e) => setRecorrente(e.target.checked)}
+                className="h-4 w-4 accent-brand"
+              />
+              <span className="flex-1 text-[13px] font-semibold text-text-1">
+                Repetir esta {tipo === 'receita' ? 'receita' : 'despesa'} automaticamente
+              </span>
+            </label>
+            {recorrente && (
+              <div className="mt-3">
+                {isCartaoCredito ? (
+                  <p className="text-[12px] text-text-3">
+                    Repete todo mês, cobrada no cartão <b>{carteiraSelecionada?.nome}</b> — o vencimento
+                    é o da fatura do cartão, não uma data própria.
+                  </p>
+                ) : (
+                  <>
+                    <Field label="Frequência">
+                      <Select value={frequenciaRec} onChange={(e) => setFrequenciaRec(e.target.value as FrequenciaRecorrencia)}>
+                        <option value="mensal">Mensal</option>
+                        <option value="semanal">Semanal</option>
+                        <option value="anual">Anual</option>
+                      </Select>
+                    </Field>
+                    <p className="mt-2 text-[11px] text-text-3">
+                      Cria uma recorrência a partir de {formatDate(new Date(`${data}T00:00:00`), 'dd/MM')} — gerenciável em "Recorrências".
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {erro && <p className="mt-3 text-[12px] font-medium text-danger">{erro}</p>}

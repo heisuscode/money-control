@@ -13,38 +13,35 @@ import { formatCurrency, formatDate, formatNumber, daysUntil, maskMoneyInput, pa
 import { sum, inMonth } from '@/lib/finance'
 import type { Conta } from '@/lib/types'
 import { cn } from '@/lib/cn'
+import { useFinanceiro } from '@/financeiro/FinanceiroContext'
+import { PagarContaModal, isVirtual, type ContaPagavel } from '@/financeiro/PagarContaModal'
 
 export default function Contas() {
   const { contas, loading, error, reload, refreshAll } = useData()
+  const { contasVirtuais } = useFinanceiro()
   const toast = useToast()
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState<Conta | null>(null)
   const [excluir, setExcluir] = useState<Conta | null>(null)
+  const [pagando, setPagando] = useState<ContaPagavel | null>(null)
 
   const now = new Date()
-  const atrasadas = contas.filter((c) => c.status === 'atrasado')
-  const aVencer = contas.filter((c) => c.status === 'pendente' && daysUntil(c.vencimento) >= 0 && daysUntil(c.vencimento) <= 7)
-  const pagasMes = contas.filter((c) => c.status === 'pago' && c.pago_em && inMonth(c.pago_em, now.getFullYear(), now.getMonth()))
+
+  const todas = useMemo<ContaPagavel[]>(() => [...contas, ...contasVirtuais], [contas, contasVirtuais])
+
+  const atrasadas = todas.filter((c) => c.status === 'atrasado')
+  const aVencer = todas.filter((c) => c.status === 'pendente' && daysUntil(c.vencimento) >= 0 && daysUntil(c.vencimento) <= 7)
+  const pagasMes = todas.filter((c) => c.status === 'pago' && c.pago_em && inMonth(c.pago_em, now.getFullYear(), now.getMonth()))
 
   const ordenadas = useMemo(
     () =>
-      [...contas].sort((a, b) => {
+      [...todas].sort((a, b) => {
         if (a.status === 'pago' && b.status !== 'pago') return 1
         if (a.status !== 'pago' && b.status === 'pago') return -1
         return a.vencimento < b.vencimento ? -1 : 1
       }),
-    [contas],
+    [todas],
   )
-
-  async function pagar(c: Conta) {
-    const { error } = await supabase
-      .from('contas')
-      .update({ status: 'pago', pago_em: todayISO() })
-      .eq('id', c.id)
-    if (error) return toast('error', 'Não foi possível marcar como paga.')
-    toast('success', 'Conta marcada como paga.')
-    reload(['contas'])
-  }
 
   async function confirmarExcluir() {
     if (!excluir) return
@@ -110,6 +107,9 @@ export default function Contas() {
               {ordenadas.map((c) => {
                 const pago = c.status === 'pago'
                 const dias = daysUntil(c.vencimento)
+                const virtual = isVirtual(c)
+                const recorrente = virtual && c.origem === 'recorrencia'
+                const soDetalhes = recorrente || (virtual && !!c.faturaAberta)
                 return (
                   <div
                     key={c.id}
@@ -127,8 +127,9 @@ export default function Contas() {
                       </span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className={cn('text-[14px] font-semibold text-text-1', pago && 'line-through')}>
+                      <div className={cn('flex items-center gap-1.5 text-[14px] font-semibold text-text-1', pago && 'line-through')}>
                         {c.descricao}
+                        {recorrente && <span className="text-[12px]" title="Recorrente">🔁</span>}
                       </div>
                       <div
                         className={cn(
@@ -153,24 +154,30 @@ export default function Contas() {
                         <Check size={16} />
                       </span>
                     ) : (
-                      <Button className="!px-4 !py-2 text-[13px]" onClick={() => pagar(c)}>
-                        Pagar
+                      <Button
+                        variant={soDetalhes ? 'ghost' : 'primary'}
+                        className="!px-4 !py-2 text-[13px]"
+                        onClick={() => setPagando(c)}
+                      >
+                        {soDetalhes ? 'Detalhes' : 'Pagar'}
                       </Button>
                     )}
-                    <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                      <button
-                        onClick={() => { setEditando(c); setModal(true) }}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-text-2 hover:bg-subtle"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      <button
-                        onClick={() => setExcluir(c)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-danger hover:bg-danger-bg"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
+                    {!virtual && (
+                      <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                        <button
+                          onClick={() => { setEditando(c); setModal(true) }}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-text-2 hover:bg-subtle"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => setExcluir(c)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-danger hover:bg-danger-bg"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -180,6 +187,7 @@ export default function Contas() {
       </PageBody>
 
       <ContaModal open={modal} onOpenChange={setModal} editar={editando} onSaved={() => reload(['contas'])} />
+      <PagarContaModal conta={pagando} onClose={() => setPagando(null)} />
       <ConfirmDialog
         open={!!excluir}
         onOpenChange={(v) => !v && setExcluir(null)}

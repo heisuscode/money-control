@@ -12,6 +12,8 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
+  Wallet,
+  Repeat,
   type LucideIcon,
 } from 'lucide-react'
 import { Logo } from './Logo'
@@ -31,6 +33,8 @@ const PRINCIPAL: Item[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/receitas', label: 'Receitas', icon: ArrowUp },
   { to: '/despesas', label: 'Despesas', icon: ArrowDown },
+  { to: '/carteiras', label: 'Carteiras & Cartões', icon: Wallet, badge: 'novo' },
+  { to: '/recorrencias', label: 'Recorrências', icon: Repeat, badge: 'novo' },
   { to: '/contas', label: 'Contas a pagar', icon: FileText },
   { to: '/metas', label: 'Metas', icon: Target },
   { to: '/relatorios', label: 'Relatórios', icon: BarChart3 },
@@ -88,8 +92,7 @@ export function AppSidebar() {
               <span className="ml-auto rounded-md bg-[#DCE8FF] px-1.5 py-[3px] text-[9px] font-extrabold text-[#1D4ED8] dark:bg-[rgba(79,132,255,.2)] dark:text-[#9DB8FF]">
                 NOVO
               </span>
-            )}
-            {!collapsed && it.badge === 'count' && unread > 0 && (
+            )}            {!collapsed && it.badge === 'count' && unread > 0 && (
               <span className="ml-auto flex h-[18px] w-[18px] items-center justify-center rounded-full bg-danger text-[10px] font-extrabold text-white">
                 {unread}
               </span>

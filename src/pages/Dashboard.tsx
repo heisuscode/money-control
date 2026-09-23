@@ -19,12 +19,17 @@ import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, formatCurrencyParts, formatDate, formatDateLong, daysUntil } from '@/lib/format'
 import { monthlySeries, sum, inMonth, pctChange } from '@/lib/finance'
 import { cn } from '@/lib/cn'
+import { OrcamentoResumo, ProjecaoCard } from '@/financeiro/DashboardExtras'
+import { useFinanceiro } from '@/financeiro/FinanceiroContext'
+import { PagarContaModal, type ContaPagavel } from '@/financeiro/PagarContaModal'
 
 export default function Dashboard() {
   const { receitas, despesas, metas, contas, loading } = useData()
+  const { contasVirtuais } = useFinanceiro()
   const { perfil, user } = useAuth()
   const { open } = useNovaTransacao()
   const [range, setRange] = useState<'6m' | 'ano'>('6m')
+  const [pagarConta, setPagarConta] = useState<ContaPagavel | null>(null)
 
   const primeiroNome = (perfil?.nome || user?.email?.split('@')[0] || '').split(' ')[0]
   const saudacao = primeiroNome ? `Olá, ${primeiroNome}` : 'Olá! 👋'
@@ -64,11 +69,11 @@ export default function Dashboard() {
 
   const proximas = useMemo(
     () =>
-      contas
+      [...contas, ...contasVirtuais]
         .filter((c) => c.status !== 'pago')
         .sort((a, b) => (a.vencimento < b.vencimento ? -1 : 1))
-        .slice(0, 3),
-    [contas],
+        .slice(0, 4),
+    [contas, contasVirtuais],
   )
 
   const saldoParts = formatCurrencyParts(saldo)
@@ -335,7 +340,11 @@ export default function Dashboard() {
                   {proximas.map((c) => {
                     const dias = daysUntil(c.vencimento)
                     return (
-                      <div key={c.id} className="flex items-center gap-3 py-2">
+                      <button
+                        key={c.id}
+                        onClick={() => setPagarConta(c)}
+                        className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-subtle"
+                      >
                         <div className="flex h-11 w-11 flex-col items-center justify-center rounded-xl bg-subtle">
                           <span className="text-[9px] font-bold uppercase text-text-3">
                             {formatDate(c.vencimento, 'MMM')}
@@ -359,7 +368,7 @@ export default function Dashboard() {
                         <span className="num text-[14px] font-semibold text-text-1">
                           {formatCurrency(c.valor)}
                         </span>
-                      </div>
+                      </button>
                     )
                   })}
                 </div>
@@ -367,7 +376,13 @@ export default function Dashboard() {
             </Card>
           </div>
         </div>
+
+        <div className="grid gap-[18px] lg:grid-cols-2">
+          <OrcamentoResumo />
+          <ProjecaoCard />
+        </div>
       </PageBody>
+      <PagarContaModal conta={pagarConta} onClose={() => setPagarConta(null)} />
     </>
   )
 }

@@ -17,6 +17,7 @@ interface DataCtx {
   notificacoes: Notificacao[]
   rates: RateMap
   refreshAll: () => Promise<void>
+  refreshRates: () => Promise<void>
   reload: (
     keys?: Array<'categorias' | 'receitas' | 'despesas' | 'contas' | 'metas' | 'notificacoes'>,
   ) => Promise<void>
@@ -117,6 +118,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setNotificacoes((data ?? []) as Notificacao[])
   }, [])
 
+  const refreshRates = useCallback(async () => {
+    const r = await fetchRates(true).catch(() => ({}) as RateMap)
+    setRates(r)
+  }, [])
+
   const refreshAll = useCallback(async () => {
     if (!user || !configured) {
       setLoading(false)
@@ -193,6 +199,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         notificacoes,
         rates,
         refreshAll,
+        refreshRates,
         reload,
       }}
     >
