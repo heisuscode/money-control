@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   ArrowUp,
@@ -47,11 +48,42 @@ const CONTA: Item[] = [
   { to: '/configuracoes', label: 'Configurações', icon: SlidersHorizontal },
 ]
 
+// Páginas "NOVO" que o usuário já abriu neste navegador: o selo some depois da 1ª visita.
+const NOVIDADES_VISTAS = 'mc_novidades_vistas'
+
+function lerVistas(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(NOVIDADES_VISTAS) ?? '[]')
+  } catch {
+    return []
+  }
+}
+
+function useNovidadesVistas() {
+  const { pathname } = useLocation()
+  const [vistas, setVistas] = useState<string[]>(lerVistas)
+
+  useEffect(() => {
+    const novidade = PRINCIPAL.find((i) => i.badge === 'novo' && i.to === pathname)
+    if (!novidade || vistas.includes(novidade.to)) return
+    const atualizadas = [...vistas, novidade.to]
+    setVistas(atualizadas)
+    try {
+      localStorage.setItem(NOVIDADES_VISTAS, JSON.stringify(atualizadas))
+    } catch {
+      // sem localStorage: o selo só some nesta sessão
+    }
+  }, [pathname, vistas])
+
+  return vistas
+}
+
 export function AppSidebar() {
   const { collapsed, toggle } = useSidebar()
   const { perfil, user } = useAuth()
   const { notificacoes } = useData()
   const unread = notificacoes.filter((n) => !n.lida).length
+  const vistas = useNovidadesVistas()
 
   const nome = perfil?.nome || user?.email?.split('@')[0] || 'Usuário'
   const iniciais = nome
@@ -88,11 +120,12 @@ export function AppSidebar() {
             )}
             <Icon size={18} strokeWidth={2} className="shrink-0" />
             {!collapsed && <span className="whitespace-nowrap">{it.label}</span>}
-            {!collapsed && it.badge === 'novo' && (
+            {!collapsed && it.badge === 'novo' && !vistas.includes(it.to) && (
               <span className="ml-auto rounded-md bg-[#DCE8FF] px-1.5 py-[3px] text-[9px] font-extrabold text-[#1D4ED8] dark:bg-[rgba(79,132,255,.2)] dark:text-[#9DB8FF]">
                 NOVO
               </span>
-            )}            {!collapsed && it.badge === 'count' && unread > 0 && (
+            )}
+            {!collapsed && it.badge === 'count' && unread > 0 && (
               <span className="ml-auto flex h-[18px] w-[18px] items-center justify-center rounded-full bg-danger text-[10px] font-extrabold text-white">
                 {unread}
               </span>
