@@ -5,7 +5,7 @@ import { Button, Field, Input, Select } from './ui'
 import { CurrencyChip } from './CurrencyChip'
 import { CURRENCIES, getCurrency } from '@/lib/currencies'
 import { convert } from '@/lib/exchange'
-import { formatCurrency, formatNumber, parseMoney, todayISO } from '@/lib/format'
+import { formatCurrency, formatNumber, maskMoneyInput, parseMoney, todayISO } from '@/lib/format'
 import { useData } from '@/contexts/DataContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -192,7 +192,7 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
             </span>
             <Input
               value={valorStr}
-              onChange={(e) => setValorStr(e.target.value)}
+              onChange={(e) => setValorStr(maskMoneyInput(e.target.value))}
               placeholder="0,00"
               inputMode="decimal"
               className="num pl-12 text-[16px] font-semibold"

@@ -9,7 +9,7 @@ import { useData } from '@/contexts/DataContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
-import { formatCurrency, formatDate, parseMoney } from '@/lib/format'
+import { formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import { sum } from '@/lib/finance'
 import type { Meta } from '@/lib/types'
 
@@ -186,8 +186,8 @@ function MetaModal({
   useEffect(() => {
     if (open) {
       setObjetivo(editar?.objetivo ?? '')
-      setValorMeta(editar ? String(editar.valor_meta).replace('.', ',') : '')
-      setValorAtual(editar ? String(editar.valor_atual).replace('.', ',') : '')
+      setValorMeta(editar ? formatNumber(editar.valor_meta) : '')
+      setValorAtual(editar ? formatNumber(editar.valor_atual) : '')
       setPrazo(editar?.prazo ?? '')
       setIcone(editar?.icone ?? '🎯')
       setErro(null)
@@ -237,10 +237,10 @@ function MetaModal({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Valor da meta">
-            <Input value={valorMeta} onChange={(e) => setValorMeta(e.target.value)} placeholder="0,00" inputMode="decimal" className="num" />
+            <Input value={valorMeta} onChange={(e) => setValorMeta(maskMoneyInput(e.target.value))} placeholder="0,00" inputMode="decimal" className="num" />
           </Field>
           <Field label="Já guardado">
-            <Input value={valorAtual} onChange={(e) => setValorAtual(e.target.value)} placeholder="0,00" inputMode="decimal" className="num" />
+            <Input value={valorAtual} onChange={(e) => setValorAtual(maskMoneyInput(e.target.value))} placeholder="0,00" inputMode="decimal" className="num" />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -295,7 +295,7 @@ function AporteModal({ meta, onClose, onSaved }: { meta: Meta | null; onClose: (
             {formatCurrency(meta.valor_meta)}.
           </p>
           <Field label="Valor do aporte">
-            <Input value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" inputMode="decimal" className="num" autoFocus />
+            <Input value={valor} onChange={(e) => setValor(maskMoneyInput(e.target.value))} placeholder="0,00" inputMode="decimal" className="num" autoFocus />
           </Field>
           <div className="mt-2 flex gap-3">
             <Button variant="ghost" className="flex-1" onClick={onClose}>Cancelar</Button>

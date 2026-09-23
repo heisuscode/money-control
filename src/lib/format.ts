@@ -73,6 +73,16 @@ export function inMonthName(date: Date = new Date()): string {
   return format(date, 'MMMM', { locale: ptBR })
 }
 
+/** Máscara de moeda pt-BR aplicada durante a digitação (ex.: "100000" -> "1.000,00"). */
+export function maskMoneyInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (!digits) return ''
+  const cents = digits.slice(-2).padStart(2, '0')
+  const intPart = (digits.slice(0, -2) || '0').replace(/^0+(?=\d)/, '')
+  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${withThousands},${cents}`
+}
+
 /** Converte texto digitado ("1.234,56" ou "1234.56") em número. */
 export function parseMoney(input: string): number {
   if (!input) return 0

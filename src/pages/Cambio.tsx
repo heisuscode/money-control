@@ -8,7 +8,7 @@ import { CurrencyChip } from '@/components/CurrencyChip'
 import { useData } from '@/contexts/DataContext'
 import { CURRENCIES, getCurrency } from '@/lib/currencies'
 import { convert } from '@/lib/exchange'
-import { formatCurrency, formatNumber, parseMoney } from '@/lib/format'
+import { formatCurrency, formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import { format } from 'date-fns'
 import { cn } from '@/lib/cn'
 
@@ -18,7 +18,7 @@ export default function Cambio() {
   const { rates, receitas, despesas } = useData()
   const [de, setDe] = useState('BRL')
   const [para, setPara] = useState('USD')
-  const [valorStr, setValorStr] = useState('1000')
+  const [valorStr, setValorStr] = useState(() => formatNumber(1000))
   const [alerta, setAlerta] = useState(() => localStorage.getItem('mc_alerta_usd') === '1')
 
   const valor = parseMoney(valorStr)
@@ -63,7 +63,7 @@ export default function Cambio() {
                 <ConvLinha
                   label="Você converte"
                   valor={valorStr}
-                  onValor={setValorStr}
+                  onValor={(v) => setValorStr(maskMoneyInput(v))}
                   moeda={de}
                   onMoeda={setDe}
                   editavel

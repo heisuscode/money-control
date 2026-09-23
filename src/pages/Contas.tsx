@@ -9,7 +9,7 @@ import { useData } from '@/contexts/DataContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
-import { formatCurrency, formatDate, daysUntil, parseMoney, todayISO } from '@/lib/format'
+import { formatCurrency, formatDate, formatNumber, daysUntil, maskMoneyInput, parseMoney, todayISO } from '@/lib/format'
 import { sum, inMonth } from '@/lib/finance'
 import type { Conta } from '@/lib/types'
 import { cn } from '@/lib/cn'
@@ -241,7 +241,7 @@ function ContaModal({
   useEffect(() => {
     if (open) {
       setDescricao(editar?.descricao ?? '')
-      setValor(editar ? String(editar.valor).replace('.', ',') : '')
+      setValor(editar ? formatNumber(editar.valor) : '')
       setVencimento(editar?.vencimento ?? todayISO())
       setErro(null)
     }
@@ -287,7 +287,7 @@ function ContaModal({
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Valor">
-            <Input value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" inputMode="decimal" className="num" />
+            <Input value={valor} onChange={(e) => setValor(maskMoneyInput(e.target.value))} placeholder="0,00" inputMode="decimal" className="num" />
           </Field>
           <Field label="Vencimento">
             <Input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} />

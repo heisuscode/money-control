@@ -10,7 +10,7 @@ import { useData } from '@/contexts/DataContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
-import { formatCurrency, parseMoney } from '@/lib/format'
+import { formatCurrency, formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import { inMonth } from '@/lib/finance'
 import type { Categoria, TipoCategoria } from '@/lib/types'
 import { cn } from '@/lib/cn'
@@ -206,7 +206,7 @@ function CategoriaModal({
       setIcone(editar?.icone ?? '🏷️')
       setCor(editar?.cor ?? '#004AAD')
       setTipo(editar?.tipo ?? tipoInicial)
-      setOrcamento(editar && editar.orcamento > 0 ? String(editar.orcamento).replace('.', ',') : '')
+      setOrcamento(editar && editar.orcamento > 0 ? formatNumber(editar.orcamento) : '')
       setErro(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -258,7 +258,7 @@ function CategoriaModal({
             </Select>
           </Field>
           <Field label="Orçamento (opcional)">
-            <Input value={orcamento} onChange={(e) => setOrcamento(e.target.value)} placeholder="0,00" inputMode="decimal" className="num" />
+            <Input value={orcamento} onChange={(e) => setOrcamento(maskMoneyInput(e.target.value))} placeholder="0,00" inputMode="decimal" className="num" />
           </Field>
         </div>
 
