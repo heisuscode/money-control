@@ -103,7 +103,14 @@ export function PagarContaModal({ conta, onClose }: { conta: ContaPagavel | null
           ) : (
             <>
               {fatura && (
-                <Field label="Pagar com" hint="O valor sai desta conta. As compras já contaram como despesa na data da compra.">
+                <Field
+                  label="Pagar com"
+                  hint={
+                    pagadoras.length
+                      ? 'O valor sai desta conta. As compras já contaram como despesa na data da compra.'
+                      : 'Cadastre uma conta bancária ou dinheiro em Carteiras para escolher de onde sai o pagamento.'
+                  }
+                >
                   <Select value={pagadora} onChange={(e) => setPagadora(e.target.value)}>
                     <option value="">Sem carteira</option>
                     {pagadoras.map((c) => (

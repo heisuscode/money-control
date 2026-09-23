@@ -73,6 +73,19 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
     carregar().finally(() => setLoading(false))
   }, [carregar])
 
+  // Carteiras criadas em outra aba/aparelho (ex.: no celular) aparecem ao voltar para esta.
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (document.visibilityState === 'visible') carregar()
+    }
+    window.addEventListener('focus', aoVoltar)
+    document.addEventListener('visibilitychange', aoVoltar)
+    return () => {
+      window.removeEventListener('focus', aoVoltar)
+      document.removeEventListener('visibilitychange', aoVoltar)
+    }
+  }, [carregar])
+
   // Lança como receita/despesa real cada ocorrência vencida das recorrências ativas.
   // A constraint única (recorrencia_id, data) torna isso seguro contra execuções
   // repetidas (StrictMode, duas abas abertas etc.).
