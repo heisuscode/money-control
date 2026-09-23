@@ -1,32 +1,44 @@
-import * as Notifications from 'expo-notifications'
+import Constants, { ExecutionEnvironment } from 'expo-constants'
 import { Platform } from 'react-native'
 import { formatCurrency, parseDate } from '@/lib/format'
 import type { Conta, ContaVirtual } from '@/lib/types'
 
+type ModuloNotificacoes = typeof import('expo-notifications')
+
 const CANAL = 'vencimentos'
+
+// No Expo Go para Android (SDK 53+), só importar expo-notifications já lança erro.
+// Por isso o módulo é carregado sob demanda e os lembretes ficam desligados lá;
+// no APK (development/preview build) funcionam normalmente.
+const semSuporte = Platform.OS === 'android' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+
+let modulo: ModuloNotificacoes | null = null
 let preparado: Promise<boolean> | null = null
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-})
+function notificacoes(): ModuloNotificacoes | null {
+  if (semSuporte) return null
+  if (!modulo) {
+    modulo = require('expo-notifications') as ModuloNotificacoes
+    modulo.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    })
+  }
+  return modulo
+}
 
-function preparar() {
+function preparar(N: ModuloNotificacoes) {
   preparado ??= (async () => {
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync(CANAL, {
-        name: 'Vencimentos',
-        importance: Notifications.AndroidImportance.HIGH,
-      })
+      await N.setNotificationChannelAsync(CANAL, { name: 'Vencimentos', importance: N.AndroidImportance.HIGH })
     }
-    const atual = await Notifications.getPermissionsAsync()
+    const atual = await N.getPermissionsAsync()
     if (atual.granted) return true
-    const pedido = await Notifications.requestPermissionsAsync()
-    return pedido.granted
+    return (await N.requestPermissionsAsync()).granted
   })()
   return preparado
 }
@@ -36,8 +48,9 @@ function preparar() {
  * Faturas em aberto também avisam (o valor pode mudar até o fechamento).
  */
 export async function agendarLembretes(contas: (Conta | ContaVirtual)[]) {
-  if (!(await preparar())) return
-  await Notifications.cancelAllScheduledNotificationsAsync()
+  const N = notificacoes()
+  if (!N || !(await preparar(N))) return
+  await N.cancelAllScheduledNotificationsAsync()
 
   const agora = new Date()
   const pendentes = contas
@@ -53,16 +66,9 @@ export async function agendarLembretes(contas: (Conta | ContaVirtual)[]) {
     .slice(0, 40)
 
   for (const { c, quando } of pendentes) {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Vence amanhã',
-        body: `${c.descricao} · ${formatCurrency(Number(c.valor))}`,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: quando,
-        channelId: CANAL,
-      },
+    await N.scheduleNotificationAsync({
+      content: { title: 'Vence amanhã', body: `${c.descricao} · ${formatCurrency(Number(c.valor))}` },
+      trigger: { type: N.SchedulableTriggerInputTypes.DATE, date: quando, channelId: CANAL },
     })
   }
 }
