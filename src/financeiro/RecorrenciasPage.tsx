@@ -11,7 +11,7 @@ import { formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney, t
 import { cn } from '@/lib/cn'
 import type { FrequenciaRecorrencia, Recorrencia, TipoCategoria } from '@/lib/types'
 import { useFinanceiro } from './FinanceiroContext'
-import { iso, proximaOcorrencia } from './logic'
+import { iso, parcelasLancadas, proximaOcorrencia, recorrenciaConcluida } from './logic'
 
 const LABEL_FREQ: Record<FrequenciaRecorrencia, string> = {
   semanal: 'Toda semana',
@@ -30,9 +30,11 @@ export default function RecorrenciasPage() {
 
   async function alternarAtivo(rec: Recorrencia) {
     // Ao reativar, recomeça de hoje: o período pausado não gera lançamentos atrasados.
-    const dados = rec.ativo
-      ? { ...rec, ativo: false }
-      : { ...rec, ativo: true, data_inicio: todayISO(), ultima_execucao: null }
+    // Parcelamento é dívida: ao reativar, as parcelas do período pausado são lançadas.
+    const dados =
+      rec.ativo || rec.parcelas_total
+        ? { ...rec, ativo: !rec.ativo }
+        : { ...rec, ativo: true, data_inicio: todayISO(), ultima_execucao: null }
     try {
       await salvarRecorrencia(semMeta(dados), rec.id)
     } catch {
@@ -89,32 +91,41 @@ export default function RecorrenciasPage() {
                 const cart = carteiras.find((c) => c.id === r.carteira_id)
                 const proxima = proximaOcorrencia(r)
                 const noCartao = cart?.tipo === 'cartao_credito'
+                const concluida = recorrenciaConcluida(r)
+                const agenda = r.parcelas_total
+                  ? concluida
+                    ? `${r.parcelas_total}x quitadas`
+                    : `parcela ${parcelasLancadas(r)} de ${r.parcelas_total} · próxima ${formatDate(proxima, 'dd MMM')}`
+                  : noCartao
+                    ? `cobrada no ${cart?.nome} (entra na fatura) · próxima ${formatDate(proxima, 'dd MMM')}`
+                    : `${cart?.nome ?? 'Sem carteira'} · próxima em ${formatDate(proxima, 'dd MMM')}`
                 return (
-                  <div key={r.id} className={cn('group flex items-center gap-3 border-b border-line px-5 py-4 last:border-0', !r.ativo && 'opacity-50')}>
+                  <div key={r.id} className={cn('group flex items-center gap-3 border-b border-line px-5 py-4 last:border-0', (!r.ativo || concluida) && 'opacity-50')}>
                     <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-full', r.tipo === 'receita' ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger')}>
                       {r.tipo === 'receita' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-[14px] font-semibold text-text-1">{r.descricao}</div>
                       <div className="truncate text-[12px] text-text-3">
-                        {LABEL_FREQ[r.frequencia]} · {cat?.nome ?? 'Sem categoria'} ·{' '}
-                        {!r.ativo
-                          ? 'pausada'
-                          : noCartao
-                            ? `cobrada no ${cart?.nome} (entra na fatura) · próxima ${formatDate(proxima, 'dd MMM')}`
-                            : `${cart?.nome ?? 'Sem carteira'} · próxima em ${formatDate(proxima, 'dd MMM')}`}
+                        {r.parcelas_total ? `Parcelado em ${r.parcelas_total}x` : LABEL_FREQ[r.frequencia]} · {cat?.nome ?? 'Sem categoria'} ·{' '}
+                        {!r.ativo && !concluida ? 'pausada' : agenda}
                       </div>
                     </div>
                     <span className={cn('num text-[14px] font-semibold', r.tipo === 'receita' ? 'text-success' : 'text-text-1')}>
                       {r.tipo === 'receita' ? '+ ' : '− '}{formatCurrency(Number(r.valor))}
+                      {r.parcelas_total && <span className="block text-right text-[11px] font-normal text-text-3">total {formatCurrency(Number(r.valor_total))}</span>}
                     </span>
-                    <button
-                      onClick={() => alternarAtivo(r)}
-                      className={cn('rounded-full px-2.5 py-1 text-[11px] font-bold', r.ativo ? 'bg-success-bg text-success' : 'bg-subtle text-text-3')}
-                      title={r.ativo ? 'Pausar' : 'Reativar'}
-                    >
-                      {r.ativo ? 'Ativa' : 'Pausada'}
-                    </button>
+                    {concluida ? (
+                      <span className="rounded-full bg-subtle px-2.5 py-1 text-[11px] font-bold text-text-3">Concluída</span>
+                    ) : (
+                      <button
+                        onClick={() => alternarAtivo(r)}
+                        className={cn('rounded-full px-2.5 py-1 text-[11px] font-bold', r.ativo ? 'bg-success-bg text-success' : 'bg-subtle text-text-3')}
+                        title={r.ativo ? 'Pausar' : 'Reativar'}
+                      >
+                        {r.ativo ? 'Ativa' : 'Pausada'}
+                      </button>
+                    )}
                     <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100 max-md:opacity-100">
                       <button onClick={() => { setEditando(r); setModal(true) }} className="flex h-8 w-8 items-center justify-center rounded-lg text-text-2 hover:bg-subtle" title="Editar"><Pencil size={15} /></button>
                       <button onClick={() => setExcluir(r)} className="flex h-8 w-8 items-center justify-center rounded-lg text-danger hover:bg-danger-bg" title="Remover"><Trash2 size={15} /></button>
@@ -195,6 +206,24 @@ function RecorrenciaModal({
   async function salvar() {
     setErro(null)
     if (!descricao.trim()) return setErro('Informe a descrição.')
+
+    // Parcelamento: valor, cartão e agenda são fixos (definem as parcelas); só dá
+    // para renomear ou recategorizar.
+    if (editar?.parcelas_total) {
+      setSalvando(true)
+      try {
+        const { id: _id, usuario_id: _u, criado_em: _c, ...atual } = editar
+        await salvarRecorrencia({ ...atual, descricao: descricao.trim(), categoria_id: categoriaId || null }, editar.id)
+        toast('success', 'Parcelamento atualizado.')
+        onOpenChange(false)
+      } catch {
+        setErro('Não foi possível salvar.')
+      } finally {
+        setSalvando(false)
+      }
+      return
+    }
+
     const v = parseMoney(valor)
     if (v <= 0) return setErro('Informe um valor maior que zero.')
     const d = Number(dia)
@@ -222,6 +251,8 @@ function RecorrenciaModal({
           dia: frequencia === 'semanal' ? Math.min(6, Math.max(0, d)) : d,
           data_inicio: inicioEfetivo,
           ultima_execucao: mudouRegra ? null : (editar?.ultima_execucao ?? null),
+          parcelas_total: null,
+          valor_total: null,
         },
         editar?.id,
       )
@@ -234,12 +265,26 @@ function RecorrenciaModal({
     }
   }
 
+  const travado = !!editar?.parcelas_total
+
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={editar ? 'Editar recorrência' : 'Nova recorrência'} maxWidth={460}>
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title={travado ? 'Editar parcelamento' : editar ? 'Editar recorrência' : 'Nova recorrência'}
+      maxWidth={460}
+    >
       <div className="flex flex-col gap-4">
         <Field label="Descrição">
           <Input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex.: Assinatura Spotify" />
         </Field>
+        {travado && editar && (
+          <p className="-mt-1 rounded-lg bg-subtle px-3 py-2 text-[12px] text-text-2">
+            Compra de {formatCurrency(Number(editar.valor_total))} em {editar.parcelas_total}x no cartão. Valor, cartão e
+            datas das parcelas não mudam; para cancelar as parcelas restantes, remova o parcelamento.
+          </p>
+        )}
+        <fieldset disabled={travado} className="contents">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Tipo">
             <Select value={tipo} onChange={(e) => setTipo(e.target.value as TipoCategoria)}>
@@ -247,10 +292,11 @@ function RecorrenciaModal({
               <option value="receita">Receita</option>
             </Select>
           </Field>
-          <Field label="Valor">
+          <Field label={travado ? 'Valor da parcela' : 'Valor'}>
             <Input value={valor} onChange={(e) => setValor(maskMoneyInput(e.target.value))} placeholder="0,00" inputMode="decimal" className="num" />
           </Field>
         </div>
+        </fieldset>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Categoria">
             <Select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
@@ -259,12 +305,14 @@ function RecorrenciaModal({
             </Select>
           </Field>
           <Field label={tipo === 'receita' ? 'Recebida em' : 'Paga com'}>
-            <Select value={carteiraId} onChange={(e) => setCarteiraId(e.target.value)}>
+            <Select value={carteiraId} disabled={travado} onChange={(e) => setCarteiraId(e.target.value)}>
               <option value="">Sem carteira</option>
               {carteirasDisponiveis.map((c) => <option key={c.id} value={c.id}>{c.icone} {c.nome}</option>)}
             </Select>
           </Field>
         </div>
+        {!travado && (
+        <>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Frequência">
             <Select value={frequencia} disabled={!!cartaoSelecionado} onChange={(e) => setFrequencia(e.target.value as FrequenciaRecorrencia)}>
@@ -296,6 +344,8 @@ function RecorrenciaModal({
         <Field label="Início da recorrência" hint="Se for no passado, os lançamentos desde essa data são criados automaticamente.">
           <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
         </Field>
+        </>
+        )}
 
         {erro && <p className="text-[12px] font-medium text-danger">{erro}</p>}
         <div className="mt-2 flex gap-3">

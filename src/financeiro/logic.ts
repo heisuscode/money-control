@@ -32,6 +32,7 @@ function somaMeses(ref: Date, meses: number, dia: number): Date {
 /* --------------------------- Recorrências --------------------------- */
 
 type RegraRecorrencia = Pick<Recorrencia, 'frequencia' | 'dia' | 'data_inicio' | 'ultima_execucao'>
+type Parcelamento = RegraRecorrencia & Pick<Recorrencia, 'valor' | 'parcelas_total' | 'valor_total'>
 
 export function primeiraOcorrencia(rec: RegraRecorrencia): Date {
   const inicio = parseDate(rec.data_inicio)
@@ -60,6 +61,47 @@ export function proximaOcorrencia(rec: RegraRecorrencia): Date {
   return proximaAposA(rec, parseDate(rec.ultima_execucao))
 }
 
+/* --------------------------- Parcelamento --------------------------- */
+
+/** Número (1-based) da parcela que cai em `data` — parcelas são mensais. */
+export function numeroParcela(rec: RegraRecorrencia, data: string | Date): number {
+  const p = primeiraOcorrencia(rec)
+  const d = typeof data === 'string' ? parseDate(data) : data
+  return (d.getFullYear() - p.getFullYear()) * 12 + d.getMonth() - p.getMonth() + 1
+}
+
+export function parcelasLancadas(rec: RegraRecorrencia): number {
+  return rec.ultima_execucao ? numeroParcela(rec, rec.ultima_execucao) : 0
+}
+
+/** Parcelamento com todas as parcelas já lançadas: não gera mais nada. */
+export function recorrenciaConcluida(rec: Parcelamento): boolean {
+  return !!rec.parcelas_total && parcelasLancadas(rec) >= rec.parcelas_total
+}
+
+const centavos = (v: number) => Math.round(v * 100) / 100
+
+/** Divide o total em parcelas iguais; a última absorve a diferença de centavos. */
+export function dividirEmParcelas(total: number, parcelas: number): { valor: number; ultima: number } {
+  const valor = Math.floor((total / parcelas) * 100) / 100
+  return { valor, ultima: centavos(total - valor * (parcelas - 1)) }
+}
+
+export function valorDaParcela(rec: Parcelamento, k: number): number {
+  if (rec.parcelas_total && rec.valor_total && k === rec.parcelas_total) {
+    return centavos(Number(rec.valor_total) - Number(rec.valor) * (rec.parcelas_total - 1))
+  }
+  return Number(rec.valor)
+}
+
+/** Soma das parcelas ainda não lançadas (compromete o limite do cartão). */
+export function valorParcelasFuturas(rec: Parcelamento): number {
+  if (!rec.parcelas_total) return 0
+  let total = 0
+  for (let k = parcelasLancadas(rec) + 1; k <= rec.parcelas_total; k++) total += valorDaParcela(rec, k)
+  return centavos(total)
+}
+
 /** Datas (até hoje) em que a recorrência já deveria ter gerado lançamento. */
 export function ocorrenciasPendentes(rec: Recorrencia, limite = 36): string[] {
   if (!rec.ativo) return []
@@ -67,6 +109,7 @@ export function ocorrenciasPendentes(rec: Recorrencia, limite = 36): string[] {
   const out: string[] = []
   let prox = proximaOcorrencia(rec)
   while (prox <= hoje && out.length < limite) {
+    if (rec.parcelas_total && numeroParcela(rec, prox) > rec.parcelas_total) break
     out.push(iso(prox))
     prox = proximaAposA(rec, prox)
   }
@@ -146,6 +189,8 @@ export interface ResumoCartao {
   aberta: { ciclo: Ciclo; total: number }
   fechadas: FaturaFechada[]
   emAberto: number
+  /** parcelas de compras parceladas que ainda vão cair nas próximas faturas */
+  parcelasFuturas: number
   disponivel: number
 }
 
@@ -154,7 +199,12 @@ export interface ResumoCartao {
  * Faturas que venceram antes do cartão ser cadastrado são histórico (quitadas fora
  * do app) e não aparecem como pendentes.
  */
-export function resumoCartao(cart: Cartao, despesas: Mov[], faturasPagas: Record<string, unknown>): ResumoCartao {
+export function resumoCartao(
+  cart: Cartao,
+  despesas: Mov[],
+  faturasPagas: Record<string, unknown>,
+  recorrencias: Recorrencia[] = [],
+): ResumoCartao {
   const cadastradoEm = iso(new Date(cart.criado_em))
   const cAberto = cicloAberto(cart)
   const aberta = { ciclo: cAberto, total: totalNoPeriodo(cart.id, cAberto, despesas) }
@@ -166,7 +216,12 @@ export function resumoCartao(cart: Cartao, despesas: Mov[], faturasPagas: Record
     .filter((f) => f.total > 0)
     .filter((f) => f.paga || iso(f.ciclo.vencimento) >= cadastradoEm)
   const emAberto = aberta.total + fechadas.filter((f) => !f.paga).reduce((a, f) => a + f.total, 0)
-  return { aberta, fechadas, emAberto, disponivel: Number(cart.limite ?? 0) - emAberto }
+  // Como no banco: a compra parcelada ocupa o limite pelo valor total, e cada
+  // parcela paga libera a sua parte.
+  const parcelasFuturas = recorrencias
+    .filter((r) => r.ativo && r.carteira_id === cart.id)
+    .reduce((a, r) => a + valorParcelasFuturas(r), 0)
+  return { aberta, fechadas, emAberto, parcelasFuturas, disponivel: Number(cart.limite ?? 0) - emAberto - parcelasFuturas }
 }
 
 /* --------------------------- Projeção de saldo ------------------------ */
@@ -197,7 +252,10 @@ export function projecaoSaldo(
     let prox = proximaOcorrencia(rec)
     let guard = 0
     while (prox <= limite && guard < 120) {
-      if (prox > hoje) add(iso(prox), rec.tipo === 'receita' ? Number(rec.valor) : -Number(rec.valor))
+      const k = rec.parcelas_total ? numeroParcela(rec, prox) : 0
+      if (rec.parcelas_total && k > rec.parcelas_total) break
+      const valor = rec.parcelas_total ? valorDaParcela(rec, k) : Number(rec.valor)
+      if (prox > hoje) add(iso(prox), rec.tipo === 'receita' ? valor : -valor)
       prox = proximaAposA(rec, prox)
       guard++
     }

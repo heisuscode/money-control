@@ -80,6 +80,10 @@ export interface Recorrencia {
   data_inicio: string
   /** última ocorrência já lançada como receita/despesa */
   ultima_execucao: string | null
+  /** compra parcelada: nº de parcelas (null = repete sem fim) */
+  parcelas_total: number | null
+  /** compra parcelada: valor total (a última parcela absorve os centavos) */
+  valor_total: number | null
   criado_em: string
 }
 

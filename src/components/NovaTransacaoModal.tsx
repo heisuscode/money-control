@@ -13,6 +13,7 @@ import { useToast } from './ui/Toast'
 import type { FrequenciaRecorrencia, Movimentacao, TipoCategoria } from '@/lib/types'
 import { cn } from '@/lib/cn'
 import { useFinanceiro } from '@/financeiro/FinanceiroContext'
+import { dividirEmParcelas } from '@/financeiro/logic'
 
 interface Props {
   open: boolean
@@ -39,6 +40,7 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
   const [erro, setErro] = useState<string | null>(null)
   const [recorrente, setRecorrente] = useState(false)
   const [frequenciaRec, setFrequenciaRec] = useState<FrequenciaRecorrencia>('mensal')
+  const [parcelas, setParcelas] = useState(1)
 
   // Reinicia / carrega valores ao abrir
   useEffect(() => {
@@ -62,6 +64,7 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
     }
     setRecorrente(false)
     setFrequenciaRec('mensal')
+    setParcelas(1)
     setErro(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editar, tipoInicial])
@@ -81,10 +84,21 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
     if (isCartaoCredito) setFrequenciaRec('mensal')
   }, [isCartaoCredito])
 
+  // Parcelamento só existe para despesa nova no cartão de crédito.
+  const podeParcelar = isCartaoCredito && tipo === 'despesa' && !editar
+  const parcelado = podeParcelar && parcelas > 1
+  useEffect(() => {
+    if (!podeParcelar) setParcelas(1)
+  }, [podeParcelar])
+  useEffect(() => {
+    if (parcelado) setRecorrente(false)
+  }, [parcelado])
+
   const valorNum = parseMoney(valorStr)
   // taxa registrada = BRL por 1 unidade da moeda escolhida (RN07)
   const taxa = rates[moeda]?.brlPerUnit ?? 1
   const convertido = moeda === 'BRL' ? valorNum : convert(valorNum, moeda, 'BRL', rates)
+  const divisao = dividirEmParcelas(Number(convertido.toFixed(2)), Math.max(parcelas, 1))
 
   const filtradas = CURRENCIES.filter(
     (c) =>
@@ -119,6 +133,37 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
         const { error } = await supabase.from(tabela).update(registro).eq('id', editar.id)
         if (error) throw error
         toast('success', 'Transação atualizada.')
+      } else if (parcelado) {
+        // Compra parcelada = recorrência mensal com fim. A 1ª parcela é lançada agora
+        // (na fatura desta data); as demais entram sozinhas, uma por mês.
+        const d = new Date(`${data}T00:00:00`)
+        const rec = await salvarRecorrencia({
+          ativo: true,
+          tipo,
+          descricao: descricao.trim(),
+          valor: divisao.valor,
+          categoria_id: categoriaId || null,
+          carteira_id: carteiraId || null,
+          frequencia: 'mensal',
+          dia: d.getDate(),
+          data_inicio: data,
+          ultima_execucao: data,
+          parcelas_total: parcelas,
+          valor_total: valorBRL,
+        })
+        const { error } = await supabase.from(tabela).insert({
+          ...registro,
+          descricao: `${descricao.trim()} (1/${parcelas})`,
+          valor: divisao.valor,
+          valor_convertido: divisao.valor,
+          valor_original: Number((valorNum / parcelas).toFixed(2)),
+          recorrencia_id: rec.id,
+        })
+        if (error) {
+          await removerRecorrencia(rec.id).catch(() => {})
+          throw error
+        }
+        toast('success', `Compra parcelada em ${parcelas}x registrada.`)
       } else if (recorrente) {
         // A recorrência nasce já "executada" nesta data: este lançamento é a 1ª
         // ocorrência (vinculada a ela) e as próximas são geradas automaticamente.
@@ -134,6 +179,8 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
           dia: frequenciaRec === 'semanal' ? d.getDay() : d.getDate(),
           data_inicio: data,
           ultima_execucao: data,
+          parcelas_total: null,
+          valor_total: null,
         })
         const { error } = await supabase.from(tabela).insert({ ...registro, recorrencia_id: rec.id })
         if (error) {
@@ -316,7 +363,53 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
           </Select>
         </Field>
 
-        {!editar && (
+        {podeParcelar && (
+          <div className="rounded-xl border border-line p-3">
+            <div className="grid grid-cols-2 gap-2 rounded-lg bg-subtle p-1">
+              {(['vista', 'parcelado'] as const).map((forma) => {
+                const ativo = forma === 'parcelado' ? parcelado : !parcelado
+                return (
+                  <button
+                    key={forma}
+                    type="button"
+                    onClick={() => setParcelas(forma === 'parcelado' ? Math.max(parcelas, 2) : 1)}
+                    className={cn(
+                      'rounded-md py-1.5 text-[13px] font-semibold transition',
+                      ativo ? 'bg-surface text-brand shadow-sm' : 'text-text-2',
+                    )}
+                  >
+                    {forma === 'vista' ? 'À vista' : 'Parcelado'}
+                  </button>
+                )
+              })}
+            </div>
+            {parcelado && (
+              <div className="mt-3 flex flex-col gap-2">
+                <Field label="Número de parcelas">
+                  <Select value={parcelas} onChange={(e) => setParcelas(Number(e.target.value))}>
+                    {Array.from({ length: 23 }, (_, i) => i + 2).map((n) => {
+                      const d = dividirEmParcelas(Number(convertido.toFixed(2)), n)
+                      return (
+                        <option key={n} value={n}>
+                          {n}x de {formatCurrency(d.valor)}
+                        </option>
+                      )
+                    })}
+                  </Select>
+                </Field>
+                {valorNum > 0 && (
+                  <p className="text-[12px] text-text-3">
+                    Total {formatCurrency(convertido)} em {parcelas}x de <b className="num">{formatCurrency(divisao.valor)}</b>
+                    {divisao.ultima !== divisao.valor && <> (última de {formatCurrency(divisao.ultima)})</>}. A 1ª cai na
+                    fatura desta compra e as demais entram sozinhas, uma por mês. O limite já desconta o total.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!editar && !parcelado && (
           <div className="rounded-xl border border-line p-3">
             <label className="flex cursor-pointer items-center gap-2.5">
               <input

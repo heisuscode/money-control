@@ -4,7 +4,16 @@ import { useData } from '@/contexts/DataContext'
 import { supabase } from '@/lib/supabase'
 import { daysUntil } from '@/lib/format'
 import type { Carteira, ContaVirtual, PagamentoFatura, Recorrencia } from '@/lib/types'
-import { chaveFatura, iso, ocorrenciasPendentes, proximaOcorrencia, resumoCartao } from './logic'
+import {
+  chaveFatura,
+  iso,
+  numeroParcela,
+  ocorrenciasPendentes,
+  proximaOcorrencia,
+  recorrenciaConcluida,
+  resumoCartao,
+  valorDaParcela,
+} from './logic'
 
 export type CarteiraInput = Omit<Carteira, 'id' | 'usuario_id' | 'criado_em'>
 export type RecorrenciaInput = Omit<Recorrencia, 'id' | 'usuario_id' | 'criado_em'>
@@ -104,12 +113,15 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
           pendentes
             .filter((p) => p.rec.tipo === tipo)
             .flatMap(({ rec, datas }) =>
-              datas.map((data) => ({
+              datas.map((data) => {
+                const k = rec.parcelas_total ? numeroParcela(rec, data) : 0
+                const valor = rec.parcelas_total ? valorDaParcela(rec, k) : Number(rec.valor)
+                return {
                 usuario_id: user.id,
-                descricao: rec.descricao,
-                valor: rec.valor,
-                valor_original: rec.valor,
-                valor_convertido: rec.valor,
+                descricao: rec.parcelas_total ? `${rec.descricao} (${k}/${rec.parcelas_total})` : rec.descricao,
+                valor,
+                valor_original: valor,
+                valor_convertido: valor,
                 moeda_original: 'BRL',
                 taxa: 1,
                 taxa_timestamp: agora,
@@ -117,7 +129,8 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
                 categoria_id: rec.categoria_id,
                 carteira_id: rec.carteira_id,
                 recorrencia_id: rec.id,
-              })),
+                }
+              }),
             )
         for (const [tabela, tipo] of [['receitas', 'receita'], ['despesas', 'despesa']] as const) {
           const rows = linhas(tipo)
@@ -215,7 +228,7 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
     const faturas = carteiras
       .filter((c) => c.tipo === 'cartao_credito')
       .flatMap((c) => {
-        const r = resumoCartao(c, despesas, pagamentosFatura)
+        const r = resumoCartao(c, despesas, pagamentosFatura, recorrencias)
         const fechadas = r.fechadas.map((f): ContaVirtual => {
           const venc = iso(f.ciclo.vencimento)
           return {
@@ -255,7 +268,7 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
 
     // Recorrências no cartão entram na fatura; aqui só as que saem de conta/dinheiro.
     const recorrentes = recorrencias
-      .filter((r) => r.ativo && r.tipo === 'despesa')
+      .filter((r) => r.ativo && r.tipo === 'despesa' && !recorrenciaConcluida(r))
       .filter((r) => carteiras.find((c) => c.id === r.carteira_id)?.tipo !== 'cartao_credito')
       .map((r): ContaVirtual => {
         const venc = iso(proximaOcorrencia(r))

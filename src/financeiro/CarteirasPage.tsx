@@ -20,7 +20,7 @@ const CORES = ['#004AAD', '#16A34A', '#820AD1', '#E5484D', '#F59E0B', '#06B6D4',
 
 export default function CarteirasPage() {
   const { receitas, despesas, loading: carregandoDados } = useData()
-  const { carteiras, removerCarteira, pagamentosFatura, loading: carregandoCarteiras, erro } = useFinanceiro()
+  const { carteiras, recorrencias, removerCarteira, pagamentosFatura, loading: carregandoCarteiras, erro } = useFinanceiro()
   const toast = useToast()
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState<Carteira | null>(null)
@@ -44,7 +44,10 @@ export default function CarteirasPage() {
   const contas = carteiras.filter((c) => c.tipo !== 'cartao_credito')
   const cartoes = carteiras.filter((c) => c.tipo === 'cartao_credito')
   const saldoContas = contas.reduce((a, c) => a + saldo(c), 0)
-  const dividaCartoes = cartoes.reduce((a, c) => a + resumoCartao(c, despesas, pagamentosFatura).emAberto, 0)
+  const dividaCartoes = cartoes.reduce((a, c) => {
+    const r = resumoCartao(c, despesas, pagamentosFatura, recorrencias)
+    return a + r.emAberto + r.parcelasFuturas
+  }, 0)
 
   async function confirmarExcluir() {
     if (!excluir) return
@@ -157,11 +160,11 @@ export default function CarteirasPage() {
 
 function CartaoInfo({ cartao }: { cartao: Carteira }) {
   const { despesas } = useData()
-  const { pagamentosFatura } = useFinanceiro()
-  const r = resumoCartao(cartao, despesas, pagamentosFatura)
+  const { pagamentosFatura, recorrencias } = useFinanceiro()
+  const r = resumoCartao(cartao, despesas, pagamentosFatura, recorrencias)
   const limite = Number(cartao.limite ?? 0)
   const pendentes = r.fechadas.filter((f) => !f.paga)
-  const usoPct = limite > 0 ? Math.min(100, (r.emAberto / limite) * 100) : 0
+  const usoPct = limite > 0 ? Math.min(100, ((r.emAberto + r.parcelasFuturas) / limite) * 100) : 0
 
   return (
     <>
@@ -176,6 +179,12 @@ function CartaoInfo({ cartao }: { cartao: Carteira }) {
         <span>Disponível: <b className={cn('num', r.disponivel < 0 ? 'text-danger' : 'text-text-1')}>{formatCurrency(r.disponivel)}</b></span>
         <span>Limite: <b className="num text-text-1">{formatCurrency(limite)}</b></span>
       </div>
+      {r.parcelasFuturas > 0 && (
+        <div className="flex items-center justify-between rounded-lg bg-subtle px-2.5 py-1.5 text-[12px]">
+          <span className="text-text-2">Parcelas das próximas faturas</span>
+          <b className="num text-text-1">{formatCurrency(r.parcelasFuturas)}</b>
+        </div>
+      )}
       {pendentes.map((f) => (
         <div key={f.chave} className="flex items-center justify-between rounded-lg bg-warning/10 px-2.5 py-1.5 text-[12px]">
           <span className="text-text-2">Fatura fechada · vence {formatDate(f.ciclo.vencimento, 'dd/MM')}</span>
