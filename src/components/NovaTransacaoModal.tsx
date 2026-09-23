@@ -26,7 +26,7 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
   const { rates, categorias, reload } = useData()
   const { user } = useAuth()
   const toast = useToast()
-  const { carteiras, salvarRecorrencia, removerRecorrencia } = useFinanceiro()
+  const { carteiras, registrarTransacao } = useFinanceiro()
 
   const [tipo, setTipo] = useState<TipoCategoria>(tipoInicial)
   const [valorStr, setValorStr] = useState('')
@@ -132,68 +132,32 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
       if (editar) {
         const { error } = await supabase.from(tabela).update(registro).eq('id', editar.id)
         if (error) throw error
+        await reload([tabela])
         toast('success', 'Transação atualizada.')
-      } else if (parcelado) {
-        // Compra parcelada = recorrência mensal com fim. A 1ª parcela é lançada agora
-        // (na fatura desta data); as demais entram sozinhas, uma por mês.
-        const d = new Date(`${data}T00:00:00`)
-        const rec = await salvarRecorrencia({
-          ativo: true,
-          tipo,
-          descricao: descricao.trim(),
-          valor: divisao.valor,
-          categoria_id: categoriaId || null,
-          carteira_id: carteiraId || null,
-          frequencia: 'mensal',
-          dia: d.getDate(),
-          data_inicio: data,
-          ultima_execucao: data,
-          parcelas_total: parcelas,
-          valor_total: valorBRL,
-        })
-        const { error } = await supabase.from(tabela).insert({
-          ...registro,
-          descricao: `${descricao.trim()} (1/${parcelas})`,
-          valor: divisao.valor,
-          valor_convertido: divisao.valor,
-          valor_original: Number((valorNum / parcelas).toFixed(2)),
-          recorrencia_id: rec.id,
-        })
-        if (error) {
-          await removerRecorrencia(rec.id).catch(() => {})
-          throw error
-        }
-        toast('success', `Compra parcelada em ${parcelas}x registrada.`)
-      } else if (recorrente) {
-        // A recorrência nasce já "executada" nesta data: este lançamento é a 1ª
-        // ocorrência (vinculada a ela) e as próximas são geradas automaticamente.
-        const d = new Date(`${data}T00:00:00`)
-        const rec = await salvarRecorrencia({
-          ativo: true,
-          tipo,
-          descricao: descricao.trim(),
-          valor: valorBRL,
-          categoria_id: categoriaId || null,
-          carteira_id: carteiraId || null,
-          frequencia: frequenciaRec,
-          dia: frequenciaRec === 'semanal' ? d.getDay() : d.getDate(),
-          data_inicio: data,
-          ultima_execucao: data,
-          parcelas_total: null,
-          valor_total: null,
-        })
-        const { error } = await supabase.from(tabela).insert({ ...registro, recorrencia_id: rec.id })
-        if (error) {
-          await removerRecorrencia(rec.id).catch(() => {})
-          throw error
-        }
-        toast('success', tipo === 'receita' ? 'Receita recorrente criada.' : 'Despesa recorrente criada.')
       } else {
-        const { error } = await supabase.from(tabela).insert(registro)
-        if (error) throw error
-        toast('success', tipo === 'receita' ? 'Receita registrada.' : 'Despesa registrada.')
+        await registrarTransacao({
+          tipo,
+          descricao: descricao.trim(),
+          valorBRL,
+          valorOriginal: registro.valor_original,
+          moeda,
+          taxa: registro.taxa,
+          taxaTimestamp: registro.taxa_timestamp,
+          data,
+          categoriaId: categoriaId || null,
+          carteiraId: carteiraId || null,
+          parcelas: parcelado ? parcelas : 1,
+          repetir: recorrente ? frequenciaRec : null,
+        })
+        toast(
+          'success',
+          parcelado
+            ? `Compra parcelada em ${parcelas}x registrada.`
+            : recorrente
+              ? tipo === 'receita' ? 'Receita recorrente criada.' : 'Despesa recorrente criada.'
+              : tipo === 'receita' ? 'Receita registrada.' : 'Despesa registrada.',
+        )
       }
-      await reload([tabela])
       onOpenChange(false)
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao salvar.')

@@ -2,21 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useAuth } from '@/contexts/AuthContext'
 import { useData } from '@/contexts/DataContext'
 import { supabase } from '@/lib/supabase'
-import { daysUntil } from '@/lib/format'
 import type { Carteira, ContaVirtual, PagamentoFatura, Recorrencia } from '@/lib/types'
-import {
-  chaveFatura,
-  iso,
-  numeroParcela,
-  ocorrenciasPendentes,
-  proximaOcorrencia,
-  recorrenciaConcluida,
-  resumoCartao,
-  valorDaParcela,
-} from './logic'
+import * as api from './api'
+import { indexarPagamentos, montarContasVirtuais } from './contasVirtuais'
 
-export type CarteiraInput = Omit<Carteira, 'id' | 'usuario_id' | 'criado_em'>
-export type RecorrenciaInput = Omit<Recorrencia, 'id' | 'usuario_id' | 'criado_em'>
+export type { CarteiraInput, RecorrenciaInput } from './api'
 
 interface FinanceiroCtx {
   loading: boolean
@@ -25,11 +15,12 @@ interface FinanceiroCtx {
   recorrencias: Recorrencia[]
   /** pagamentos por chave de fatura (`${cartaoId}_${fimCiclo}`) */
   pagamentosFatura: Record<string, PagamentoFatura>
-  salvarCarteira: (dados: CarteiraInput, id?: string) => Promise<void>
+  salvarCarteira: (dados: api.CarteiraInput, id?: string) => Promise<void>
   removerCarteira: (id: string) => Promise<void>
-  salvarRecorrencia: (dados: RecorrenciaInput, id?: string) => Promise<Recorrencia>
+  salvarRecorrencia: (dados: api.RecorrenciaInput, id?: string) => Promise<Recorrencia>
   removerRecorrencia: (id: string) => Promise<void>
   pagarFatura: (cartaoId: string, fimCiclo: string, carteiraId: string | null, valor: number) => Promise<void>
+  registrarTransacao: (t: api.NovaTransacao) => Promise<void>
   /** Faturas de cartão + próxima ocorrência das recorrências que saem de conta/dinheiro. */
   contasVirtuais: ContaVirtual[]
 }
@@ -55,25 +46,20 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
   const [carteiras, setCarteiras] = useState<Carteira[]>([])
   const [recorrencias, setRecorrencias] = useState<Recorrencia[]>([])
   const [pagamentos, setPagamentos] = useState<PagamentoFatura[]>([])
-  const materializando = useRef(false)
+  const lancando = useRef(false)
 
   const carregar = useCallback(async () => {
     if (!user) return
-    const [c, r, p] = await Promise.all([
-      supabase.from('carteiras').select('*').eq('usuario_id', user.id).order('criado_em'),
-      supabase.from('recorrencias').select('*').eq('usuario_id', user.id).order('criado_em'),
-      supabase.from('pagamentos_fatura').select('*').eq('usuario_id', user.id),
-    ])
-    const falha = c.error ?? r.error ?? p.error
-    if (falha) {
-      console.error(falha)
-      setErro('Carteiras e recorrências indisponíveis. Verifique se a migração 002 foi aplicada no Supabase.')
-      return
+    try {
+      const dados = await api.carregarFinanceiro(supabase, user.id)
+      setErro(null)
+      setCarteiras(dados.carteiras)
+      setRecorrencias(dados.recorrencias)
+      setPagamentos(dados.pagamentos)
+    } catch (e) {
+      console.error(e)
+      setErro('Carteiras e recorrências indisponíveis. Verifique se as migrações do Supabase foram aplicadas.')
     }
-    setErro(null)
-    setCarteiras((c.data ?? []) as Carteira[])
-    setRecorrencias((r.data ?? []) as Recorrencia[])
-    setPagamentos((p.data ?? []) as PagamentoFatura[])
   }, [user])
 
   useEffect(() => {
@@ -95,77 +81,25 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
     }
   }, [carregar])
 
-  // Lança como receita/despesa real cada ocorrência vencida das recorrências ativas.
-  // A constraint única (recorrencia_id, data) torna isso seguro contra execuções
-  // repetidas (StrictMode, duas abas abertas etc.).
+  // Lança como receita/despesa real cada ocorrência vencida (inclui parcelas).
   useEffect(() => {
-    if (!user || loading || erro || materializando.current) return
-    const pendentes = recorrencias
-      .map((rec) => ({ rec, datas: ocorrenciasPendentes(rec) }))
-      .filter((p) => p.datas.length > 0)
-    if (!pendentes.length) return
-
-    materializando.current = true
-    ;(async () => {
-      try {
-        const agora = new Date().toISOString()
-        const linhas = (tipo: 'receita' | 'despesa') =>
-          pendentes
-            .filter((p) => p.rec.tipo === tipo)
-            .flatMap(({ rec, datas }) =>
-              datas.map((data) => {
-                const k = rec.parcelas_total ? numeroParcela(rec, data) : 0
-                const valor = rec.parcelas_total ? valorDaParcela(rec, k) : Number(rec.valor)
-                return {
-                usuario_id: user.id,
-                descricao: rec.parcelas_total ? `${rec.descricao} (${k}/${rec.parcelas_total})` : rec.descricao,
-                valor,
-                valor_original: valor,
-                valor_convertido: valor,
-                moeda_original: 'BRL',
-                taxa: 1,
-                taxa_timestamp: agora,
-                data,
-                categoria_id: rec.categoria_id,
-                carteira_id: rec.carteira_id,
-                recorrencia_id: rec.id,
-                }
-              }),
-            )
-        for (const [tabela, tipo] of [['receitas', 'receita'], ['despesas', 'despesa']] as const) {
-          const rows = linhas(tipo)
-          if (!rows.length) continue
-          const { error } = await supabase
-            .from(tabela)
-            .upsert(rows, { onConflict: 'recorrencia_id,data', ignoreDuplicates: true })
-          if (error) throw error
-        }
-        await Promise.all(
-          pendentes.map(({ rec, datas }) =>
-            supabase.from('recorrencias').update({ ultima_execucao: datas[datas.length - 1] }).eq('id', rec.id),
-          ),
-        )
-        await Promise.all([carregar(), reload(['receitas', 'despesas'])])
-      } catch (e) {
-        console.error('[recorrências] falha ao lançar ocorrências', e)
-      } finally {
-        materializando.current = false
-      }
-    })()
+    if (!user || loading || erro || lancando.current) return
+    lancando.current = true
+    api
+      .lancarRecorrenciasPendentes(supabase, user.id, recorrencias)
+      .then((n) => (n ? Promise.all([carregar(), reload(['receitas', 'despesas'])]) : undefined))
+      .catch((e) => console.error('[recorrências] falha ao lançar ocorrências', e))
+      .finally(() => {
+        lancando.current = false
+      })
   }, [user, loading, erro, recorrencias, carregar, reload])
 
-  const pagamentosFatura = useMemo(
-    () => Object.fromEntries(pagamentos.map((p) => [chaveFatura(p.cartao_id, p.fim_ciclo), p])),
-    [pagamentos],
-  )
+  const pagamentosFatura = useMemo(() => indexarPagamentos(pagamentos), [pagamentos])
 
   const salvarCarteira = useCallback<FinanceiroCtx['salvarCarteira']>(
     async (dados, id) => {
       if (!user) return
-      const { error } = id
-        ? await supabase.from('carteiras').update(dados).eq('id', id)
-        : await supabase.from('carteiras').insert({ ...dados, usuario_id: user.id })
-      if (error) throw error
+      await api.salvarCarteira(supabase, user.id, dados, id)
       await carregar()
     },
     [user, carregar],
@@ -173,9 +107,7 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
 
   const removerCarteira = useCallback<FinanceiroCtx['removerCarteira']>(
     async (id) => {
-      // FKs: transações e recorrências perdem o vínculo (set null); pagamentos do cartão somem (cascade).
-      const { error } = await supabase.from('carteiras').delete().eq('id', id)
-      if (error) throw error
+      await api.removerCarteira(supabase, id)
       await Promise.all([carregar(), reload(['receitas', 'despesas'])])
     },
     [carregar, reload],
@@ -184,21 +116,16 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
   const salvarRecorrencia = useCallback<FinanceiroCtx['salvarRecorrencia']>(
     async (dados, id) => {
       if (!user) throw new Error('Sessão expirada.')
-      const { data, error } = id
-        ? await supabase.from('recorrencias').update(dados).eq('id', id).select().single()
-        : await supabase.from('recorrencias').insert({ ...dados, usuario_id: user.id }).select().single()
-      if (error) throw error
+      const rec = await api.salvarRecorrencia(supabase, user.id, dados, id)
       await carregar()
-      return data as Recorrencia
+      return rec
     },
     [user, carregar],
   )
 
   const removerRecorrencia = useCallback<FinanceiroCtx['removerRecorrencia']>(
     async (id) => {
-      // lançamentos já gerados ficam no histórico (recorrencia_id vira null)
-      const { error } = await supabase.from('recorrencias').delete().eq('id', id)
-      if (error) throw error
+      await api.removerRecorrencia(supabase, id)
       await Promise.all([carregar(), reload(['receitas', 'despesas'])])
     },
     [carregar, reload],
@@ -207,88 +134,25 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
   const pagarFatura = useCallback<FinanceiroCtx['pagarFatura']>(
     async (cartaoId, fimCiclo, carteiraId, valor) => {
       if (!user) return
-      const { error } = await supabase.from('pagamentos_fatura').insert({
-        usuario_id: user.id,
-        cartao_id: cartaoId,
-        fim_ciclo: fimCiclo,
-        carteira_id: carteiraId,
-        valor,
-        data: iso(new Date()),
-      })
-      if (error) throw error
+      await api.pagarFatura(supabase, user.id, cartaoId, fimCiclo, carteiraId, valor)
       await carregar()
     },
     [user, carregar],
   )
 
-  const contasVirtuais = useMemo<ContaVirtual[]>(() => {
-    const status = (venc: string, paga: boolean): ContaVirtual['status'] =>
-      paga ? 'pago' : daysUntil(venc) < 0 ? 'atrasado' : 'pendente'
+  const registrarTransacao = useCallback<FinanceiroCtx['registrarTransacao']>(
+    async (t) => {
+      if (!user) throw new Error('Sessão expirada. Faça login novamente.')
+      await api.registrarTransacao(supabase, user.id, t)
+      await Promise.all([carregar(), reload([t.tipo === 'receita' ? 'receitas' : 'despesas'])])
+    },
+    [user, carregar, reload],
+  )
 
-    const faturas = carteiras
-      .filter((c) => c.tipo === 'cartao_credito')
-      .flatMap((c) => {
-        const r = resumoCartao(c, despesas, pagamentosFatura, recorrencias)
-        const fechadas = r.fechadas.map((f): ContaVirtual => {
-          const venc = iso(f.ciclo.vencimento)
-          return {
-            id: `fatura_${f.chave}`,
-            usuario_id: c.usuario_id,
-            descricao: `Fatura ${c.nome}`,
-            valor: f.total,
-            vencimento: venc,
-            status: status(venc, f.paga),
-            pago_em: pagamentosFatura[f.chave]?.data ?? null,
-            criado_em: venc,
-            virtual: true,
-            origem: 'fatura',
-            cartaoId: c.id,
-            fimCiclo: iso(f.ciclo.fim),
-          }
-        })
-        if (r.aberta.total <= 0) return fechadas
-        const venc = iso(r.aberta.ciclo.vencimento)
-        const aberta: ContaVirtual = {
-          id: `fatura_aberta_${c.id}`,
-          usuario_id: c.usuario_id,
-          descricao: `Fatura ${c.nome} (em aberto)`,
-          valor: r.aberta.total,
-          vencimento: venc,
-          status: 'pendente',
-          pago_em: null,
-          criado_em: venc,
-          virtual: true,
-          origem: 'fatura',
-          cartaoId: c.id,
-          faturaAberta: true,
-          fechaEm: iso(r.aberta.ciclo.fim),
-        }
-        return [...fechadas, aberta]
-      })
-
-    // Recorrências no cartão entram na fatura; aqui só as que saem de conta/dinheiro.
-    const recorrentes = recorrencias
-      .filter((r) => r.ativo && r.tipo === 'despesa' && !recorrenciaConcluida(r))
-      .filter((r) => carteiras.find((c) => c.id === r.carteira_id)?.tipo !== 'cartao_credito')
-      .map((r): ContaVirtual => {
-        const venc = iso(proximaOcorrencia(r))
-        return {
-          id: `rec_${r.id}_${venc}`,
-          usuario_id: r.usuario_id,
-          descricao: r.descricao,
-          valor: Number(r.valor),
-          vencimento: venc,
-          status: status(venc, false),
-          pago_em: null,
-          criado_em: venc,
-          virtual: true,
-          origem: 'recorrencia',
-          recorrenciaId: r.id,
-        }
-      })
-
-    return [...faturas, ...recorrentes]
-  }, [carteiras, recorrencias, despesas, pagamentosFatura])
+  const contasVirtuais = useMemo(
+    () => montarContasVirtuais(carteiras, recorrencias, despesas, pagamentosFatura),
+    [carteiras, recorrencias, despesas, pagamentosFatura],
+  )
 
   const value = useMemo<FinanceiroCtx>(
     () => ({
@@ -302,9 +166,10 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
       salvarRecorrencia,
       removerRecorrencia,
       pagarFatura,
+      registrarTransacao,
       contasVirtuais,
     }),
-    [loading, erro, carteiras, recorrencias, pagamentosFatura, salvarCarteira, removerCarteira, salvarRecorrencia, removerRecorrencia, pagarFatura, contasVirtuais],
+    [loading, erro, carteiras, recorrencias, pagamentosFatura, salvarCarteira, removerCarteira, salvarRecorrencia, removerRecorrencia, pagarFatura, registrarTransacao, contasVirtuais],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

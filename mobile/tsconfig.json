@@ -1,0 +1,33 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "paths": {
+      "~/*": [
+        "./src/*"
+      ],
+      "@/*": [
+        "../src/*"
+      ],
+      "@supabase/supabase-js": [
+        "./node_modules/@supabase/supabase-js"
+      ],
+      "date-fns": [
+        "./node_modules/date-fns"
+      ],
+      "date-fns/*": [
+        "./node_modules/date-fns/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}

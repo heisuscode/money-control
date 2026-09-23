@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "MoneyControl",
+    "slug": "moneycontrol",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#004AAD",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.moneycontrol.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-sqlite",
+      "@react-native-community/datetimepicker",
+      "expo-font"
+    ],
+    "scheme": "moneycontrol",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
