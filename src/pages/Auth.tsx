@@ -241,7 +241,7 @@ export default function Auth({ mode }: { mode: 'login' | 'cadastro' }) {
             )}
           </p>
           {cadastro && passwordScore(senha) >= 3 && (
-            <p className="mt-2 text-center text-[11px] text-success">Senha forte 👍</p>
+            <p className="mt-2 text-center text-[11px] text-success">Senha forte</p>
           )}
         </div>
       </div>

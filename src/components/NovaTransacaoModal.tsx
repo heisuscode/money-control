@@ -295,7 +295,7 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
               <option value="">Sem categoria</option>
               {cats.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.icone} {c.nome}
+                  {c.nome}
                 </option>
               ))}
             </Select>
@@ -321,7 +321,7 @@ export function NovaTransacaoModal({ open, onOpenChange, tipoInicial, editar }: 
             <option value="">Sem carteira</option>
             {carteirasDisponiveis.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.icone} {c.nome}
+                {c.nome}
               </option>
             ))}
           </Select>

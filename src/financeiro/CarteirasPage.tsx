@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, Wallet } from 'lucide-react'
+import { IconeItem } from '@/components/IconeItem'
+import { chaveCarteira } from '@/lib/icones'
 import { Topbar } from '@/components/Topbar'
 import { PageBody } from '@/components/PageBody'
 import { Button, Card, EmptyState, ErrorState, Field, Input, Select, Skeleton } from '@/components/ui'
@@ -14,7 +16,8 @@ import type { Carteira, TipoCarteira } from '@/lib/types'
 import { useFinanceiro } from './FinanceiroContext'
 import { resumoCartao } from './logic'
 
-const ICONE_POR_TIPO: Record<TipoCarteira, string> = { conta: '🏦', dinheiro: '💵', cartao_credito: '💳' }
+// o banco guarda a chave do ícone; o desenho vem do tipo (ver src/lib/icones.ts)
+const ICONE_POR_TIPO: Record<TipoCarteira, string> = { conta: 'banco', dinheiro: 'dinheiro', cartao_credito: 'cartao' }
 const LABEL_TIPO: Record<TipoCarteira, string> = { conta: 'Conta bancária', dinheiro: 'Dinheiro', cartao_credito: 'Cartão de crédito' }
 const CORES = ['#004AAD', '#16A34A', '#820AD1', '#E5484D', '#F59E0B', '#06B6D4', '#EC7000', '#8A95A6']
 
@@ -109,9 +112,7 @@ export default function CarteirasPage() {
                 <Card key={c.id} className="group flex flex-col gap-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-xl text-[20px]" style={{ background: `${c.cor}1f` }}>
-                        {c.icone}
-                      </span>
+                      <IconeItem chave={chaveCarteira(c.tipo)} cor={c.cor} className="h-11 w-11" tamanho={20} />
                       <div>
                         <div className="text-[15px] font-bold text-text-1">{c.nome}</div>
                         <div className="text-[12px] text-text-3">{LABEL_TIPO[c.tipo]}</div>

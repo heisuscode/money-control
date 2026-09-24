@@ -2,12 +2,14 @@ import { router } from 'expo-router'
 import { useState } from 'react'
 import { Alert, Pressable, Text, View } from 'react-native'
 import { numeroParcela } from '@/financeiro/logic'
+import { chaveIcone } from '@/lib/icones'
 import { sum } from '@/lib/finance'
 import { daysUntil, formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import type { Carteira, Categoria, Conta, ContaVirtual, Movimentacao, PagamentoFatura, Recorrencia } from '@/lib/types'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
 import { criarEstilos, f, useTema } from '~/theme'
+import { IONICONS } from './icones'
 import { Botao, Chips, Entrada, Icone, ModalCentral, num, Selo, type NomeIcone } from './ui'
 
 export type ContaPagavel = Conta | ContaVirtual
@@ -32,25 +34,16 @@ export function saldoCarteira(
   )
 }
 
-// Ícones de linha por palavra-chave da categoria (o banco guarda emoji, o app usa ícones).
-const ICONES_CATEGORIA: [RegExp, NomeIcone][] = [
-  [/aliment|mercado|comida|restaur|lanche|padaria/i, 'restaurant-outline'],
-  [/transport|uber|combust|gasolina|carro|ônibus|onibus/i, 'car-outline'],
-  [/moradia|casa|aluguel|condom|luz|água|agua|energia/i, 'home-outline'],
-  [/saúde|saude|farm|médic|medic|academia/i, 'medkit-outline'],
-  [/educa|curso|escola|faculdade|livro/i, 'school-outline'],
-  [/lazer|cinema|viagem|diversão|diversao|jogo/i, 'game-controller-outline'],
-  [/assinatura|streaming|netflix|spotify|internet|celular|telefone/i, 'tv-outline'],
-  [/roupa|vestu|compras|shopping/i, 'bag-handle-outline'],
-  [/pet/i, 'paw-outline'],
-  [/salár|salar|trabalho|freela/i, 'briefcase-outline'],
-  [/invest|rendimento|juros/i, 'trending-up-outline'],
-  [/presente|doação|doacao/i, 'gift-outline'],
-]
-
-export function iconeCategoria(cat: Pick<Categoria, 'nome'> | null | undefined, tipo: 'receita' | 'despesa' = 'despesa'): NomeIcone {
-  if (cat) for (const [re, ic] of ICONES_CATEGORIA) if (re.test(cat.nome)) return ic
-  return tipo === 'receita' ? 'arrow-down-outline' : 'pricetag-outline'
+/**
+ * Ícone de linha da categoria: chave gravada, emoji antigo ou pelo nome
+ * (tradução compartilhada com o site em src/lib/icones.ts).
+ */
+export function iconeCategoria(
+  cat: Pick<Categoria, 'nome' | 'icone'> | null | undefined,
+  tipo: 'receita' | 'despesa' = 'despesa',
+): NomeIcone {
+  if (!cat) return tipo === 'receita' ? 'arrow-down-outline' : 'pricetag-outline'
+  return IONICONS[chaveIcone(cat.icone, cat.nome)]
 }
 
 function textoVencimento(c: ContaPagavel) {

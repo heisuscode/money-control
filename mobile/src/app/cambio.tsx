@@ -29,7 +29,7 @@ export default function Cambio() {
   const pronto = Object.keys(taxas).length > 0
   const resultado = pronto ? convert(parseMoney(valor), de, para, taxas) : 0
   const quando = taxas.USD?.timestamp
-  const opcoes = CURRENCIES.map((c) => ({ valor: c.code, rotulo: `${c.flag} ${c.code}` }))
+  const opcoes = CURRENCIES.map((c) => ({ valor: c.code, rotulo: c.code, cor: c.color }))
 
   return (
     <Tela
@@ -93,7 +93,9 @@ export default function Cambio() {
               }}
               style={({ pressed }) => [st.linha, i > 0 && st.divisor, pressed && { opacity: 0.6 }]}
             >
-              <Text style={st.bandeira}>{c.flag}</Text>
+              <View style={[st.moeda, { backgroundColor: `${c.color}1F` }]}>
+                <Text style={[st.moedaSimbolo, { color: cores.texto1 }]} numberOfLines={1} adjustsFontSizeToFit>{c.symbol}</Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={st.codigo}>{c.code}</Text>
                 <Text style={st.sub} numberOfLines={1}>{c.name}</Text>
@@ -130,7 +132,8 @@ const useSt = criarEstilos((cores) => ({
   sub: { fontSize: 12, ...f[400], color: cores.texto3 },
   linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, minHeight: 56 },
   divisor: { borderTopWidth: 1, borderTopColor: cores.sutil },
-  bandeira: { fontSize: 26 },
+  moeda: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  moedaSimbolo: { fontSize: 13, ...f[800] },
   codigo: { fontSize: 14, ...f[700], color: cores.texto1 },
   variacao: { fontSize: 12, ...f[700] },
 }))

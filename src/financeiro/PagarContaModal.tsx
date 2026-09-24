@@ -134,7 +134,7 @@ export function PagarContaModal({ conta, onClose }: { conta: ContaPagavel | null
                     <Select value={pagadora} onChange={(e) => setPagadora(e.target.value)}>
                       <option value="">Sem carteira</option>
                       {pagadoras.map((c) => (
-                        <option key={c.id} value={c.id}>{c.icone} {c.nome}</option>
+                        <option key={c.id} value={c.id}>{c.nome}</option>
                       ))}
                     </Select>
                   </Field>

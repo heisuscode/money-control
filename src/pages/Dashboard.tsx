@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [pagarConta, setPagarConta] = useState<ContaPagavel | null>(null)
 
   const primeiroNome = (perfil?.nome || user?.email?.split('@')[0] || '').split(' ')[0]
-  const saudacao = primeiroNome ? `Olá, ${primeiroNome}` : 'Olá! 👋'
+  const saudacao = primeiroNome ? `Olá, ${primeiroNome}` : 'Olá!'
   const now = new Date()
 
   const { totalReceitas, totalDespesas, economia, saldo, variacao } = useMemo(() => {

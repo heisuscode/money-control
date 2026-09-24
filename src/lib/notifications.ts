@@ -59,7 +59,7 @@ export function computeNotifications(input: EngineInput): NovaNotif[] {
     if (m.valor_meta > 0 && m.valor_atual >= m.valor_meta) {
       out.push({
         tipo: 'meta',
-        titulo: 'Meta concluída! 🎉',
+        titulo: 'Meta concluída!',
         descricao: `Você atingiu a meta "${m.objetivo}" (${formatCurrency(m.valor_meta)}).`,
         chave: `meta-atingida-${m.id}`,
       })

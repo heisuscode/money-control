@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, CartesianGrid } from 'recharts'
+import { TriangleAlert } from 'lucide-react'
 import { Card, CardHeader, Skeleton } from '@/components/ui'
 import { useData } from '@/contexts/DataContext'
 import { formatCurrency } from '@/lib/format'
@@ -49,7 +50,9 @@ export function OrcamentoResumo() {
         <div className="mt-3 flex flex-col gap-1">
           {estouradas.slice(0, 3).map((c) => (
             <div key={c.nome} className="flex items-center justify-between text-[12px]">
-              <span className="text-danger">⚠ {c.nome} estourou o orçamento</span>
+              <span className="inline-flex items-center gap-1 text-danger">
+                <TriangleAlert size={13} aria-hidden /> {c.nome} estourou o orçamento
+              </span>
               <span className="num text-danger">
                 {formatCurrency(c.gasto)} / {formatCurrency(c.orcamento)}
               </span>

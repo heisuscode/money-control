@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { IconeChave, IconeItem } from '@/components/IconeItem'
+import { chaveIcone, ICONES_CATEGORIA, NOME_ICONE, type ChaveIcone } from '@/lib/icones'
 import { Topbar } from '@/components/Topbar'
 import { PageBody } from '@/components/PageBody'
 import { Button, Card, Field, Input, Select } from '@/components/ui'
@@ -15,7 +17,6 @@ import { inMonth } from '@/lib/finance'
 import type { Categoria, TipoCategoria } from '@/lib/types'
 import { cn } from '@/lib/cn'
 
-const ICONES = ['🍽️', '🚗', '🏠', '🩺', '📚', '🎬', '🛍️', '📈', '🐾', '✈️', '🎁', '💡', '📱', '☕', '🏋️', '🎵']
 const CORES = ['#16A34A', '#E5484D', '#004AAD', '#06B6D4', '#2F6BD4', '#A855F7', '#F59E0B', '#8A95A6']
 
 export default function Categorias() {
@@ -60,12 +61,7 @@ export default function Categorias() {
       <Card key={c.id} className="group">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <span
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-[18px]"
-              style={{ background: `${c.cor}1f` }}
-            >
-              {c.icone}
-            </span>
+            <IconeItem icone={c.icone} nome={c.nome} cor={c.cor} />
             <div>
               <div className="flex items-center gap-2 text-[14px] font-bold text-text-1">
                 {c.nome}
@@ -193,7 +189,7 @@ function CategoriaModal({
   const { user } = useAuth()
   const toast = useToast()
   const [nome, setNome] = useState('')
-  const [icone, setIcone] = useState('🏷️')
+  const [icone, setIcone] = useState<ChaveIcone>('etiqueta')
   const [cor, setCor] = useState('#004AAD')
   const [tipo, setTipo] = useState<TipoCategoria>(tipoInicial)
   const [orcamento, setOrcamento] = useState('')
@@ -203,7 +199,7 @@ function CategoriaModal({
   useEffect(() => {
     if (open) {
       setNome(editar?.nome ?? '')
-      setIcone(editar?.icone ?? '🏷️')
+      setIcone(editar ? chaveIcone(editar.icone, editar.nome) : 'etiqueta')
       setCor(editar?.cor ?? '#004AAD')
       setTipo(editar?.tipo ?? tipoInicial)
       setOrcamento(editar && editar.orcamento > 0 ? formatNumber(editar.orcamento) : '')
@@ -264,16 +260,20 @@ function CategoriaModal({
 
         <Field label="Ícone">
           <div className="flex flex-wrap gap-2">
-            {ICONES.map((i) => (
+            {ICONES_CATEGORIA.map((i) => (
               <button
                 key={i}
+                type="button"
                 onClick={() => setIcone(i)}
+                aria-label={NOME_ICONE[i]}
+                aria-pressed={icone === i}
+                title={NOME_ICONE[i]}
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-lg border text-[16px]',
-                  icone === i ? 'border-brand bg-active-bg' : 'border-line hover:bg-subtle',
+                  'flex h-9 w-9 items-center justify-center rounded-lg border',
+                  icone === i ? 'border-brand bg-active-bg text-brand' : 'border-line text-text-2 hover:bg-subtle',
                 )}
               >
-                {i}
+                <IconeChave chave={i} size={17} />
               </button>
             ))}
           </div>

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Plus, Target, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Target, Pencil, Trash2, CircleCheck } from 'lucide-react'
+import { IconeChave, IconeItem } from '@/components/IconeItem'
+import { cn } from '@/lib/cn'
+import { chaveIcone, ICONES_META, NOME_ICONE, type ChaveIcone } from '@/lib/icones'
 import { Topbar } from '@/components/Topbar'
 import { PageBody } from '@/components/PageBody'
-import { Button, Card, EmptyState, ErrorState, Field, Input, Select, Skeleton } from '@/components/ui'
+import { Button, Card, EmptyState, ErrorState, Field, Input, Skeleton } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useData } from '@/contexts/DataContext'
@@ -13,7 +16,6 @@ import { formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney } 
 import { sum } from '@/lib/finance'
 import type { Meta } from '@/lib/types'
 
-const ICONES = ['🎯', '✈️', '🏠', '🚗', '💻', '🎓', '💍', '🏖️', '🛡️', '📈']
 
 export default function Metas() {
   const { metas, loading, error, reload, refreshAll } = useData()
@@ -91,12 +93,7 @@ export default function Metas() {
                 <Card key={m.id} className="group flex flex-col">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <span
-                        className="flex h-11 w-11 items-center justify-center rounded-xl text-[20px]"
-                        style={{ background: `${m.cor}1f` }}
-                      >
-                        {m.icone}
-                      </span>
+                      <IconeItem icone={m.icone} nome={m.objetivo} cor={m.cor} padrao="meta" className="h-11 w-11" tamanho={20} />
                       <div>
                         <div className="text-[15px] font-bold text-text-1">{m.objetivo}</div>
                         <div className="text-[12px] text-text-3">
@@ -122,7 +119,13 @@ export default function Metas() {
                       {pct.toFixed(0)}%
                     </span>
                     <span className="num text-text-3">
-                      {completa ? 'Meta concluída 🎉' : `faltam ${formatCurrency(falta)}`}
+                      {completa ? (
+                        <span className="inline-flex items-center gap-1 font-semibold text-success">
+                          <CircleCheck size={13} aria-hidden /> Meta concluída
+                        </span>
+                      ) : (
+                        `faltam ${formatCurrency(falta)}`
+                      )}
                     </span>
                   </div>
 
@@ -179,7 +182,7 @@ function MetaModal({
   const [valorMeta, setValorMeta] = useState('')
   const [valorAtual, setValorAtual] = useState('')
   const [prazo, setPrazo] = useState('')
-  const [icone, setIcone] = useState('🎯')
+  const [icone, setIcone] = useState<ChaveIcone>('meta')
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -189,7 +192,7 @@ function MetaModal({
       setValorMeta(editar ? formatNumber(editar.valor_meta) : '')
       setValorAtual(editar ? formatNumber(editar.valor_atual) : '')
       setPrazo(editar?.prazo ?? '')
-      setIcone(editar?.icone ?? '🎯')
+      setIcone(editar ? chaveIcone(editar.icone, editar.objetivo, 'meta') : 'meta')
       setErro(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,12 +250,27 @@ function MetaModal({
           <Field label="Prazo (opcional)">
             <Input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} />
           </Field>
-          <Field label="Ícone">
-            <Select value={icone} onChange={(e) => setIcone(e.target.value)}>
-              {ICONES.map((i) => <option key={i} value={i}>{i}</option>)}
-            </Select>
-          </Field>
         </div>
+        <Field label="Ícone">
+          <div className="flex flex-wrap gap-2">
+            {ICONES_META.map((i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setIcone(i)}
+                aria-label={NOME_ICONE[i]}
+                aria-pressed={icone === i}
+                title={NOME_ICONE[i]}
+                className={cn(
+                  'flex h-9 w-9 items-center justify-center rounded-lg border',
+                  icone === i ? 'border-brand bg-active-bg text-brand' : 'border-line text-text-2 hover:bg-subtle',
+                )}
+              >
+                <IconeChave chave={i} size={17} />
+              </button>
+            ))}
+          </div>
+        </Field>
         {erro && <p className="text-[12px] font-medium text-danger">{erro}</p>}
         <div className="mt-2 flex gap-3">
           <Button variant="ghost" className="flex-1" onClick={() => onOpenChange(false)}>Cancelar</Button>

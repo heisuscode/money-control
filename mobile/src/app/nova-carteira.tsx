@@ -7,8 +7,8 @@ import { Botao, Campo, Entrada, Icone, Segmentado, Tela } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { CORES_CARTEIRA, criarEstilos, f, fundoComTextoBranco } from '~/theme'
 
-// O banco guarda um emoji por carteira (o site mostra); o app desenha ícones.
-const ICONE: Record<TipoCarteira, string> = { conta: '🏦', dinheiro: '💵', cartao_credito: '💳' }
+// O banco guarda a chave do ícone (src/lib/icones.ts); site e app desenham pelo tipo.
+const ICONE: Record<TipoCarteira, string> = { conta: 'banco', dinheiro: 'dinheiro', cartao_credito: 'cartao' }
 
 export default function NovaCarteira() {
   const st = useSt()
@@ -43,7 +43,7 @@ export default function NovaCarteira() {
           nome: nome.trim(),
           tipo,
           cor,
-          icone: existente?.tipo === tipo ? existente.icone : ICONE[tipo],
+          icone: ICONE[tipo],
           saldo_inicial: cartao ? 0 : parseMoney(saldoInicial),
           limite: cartao ? parseMoney(limite) : null,
           dia_fechamento: cartao ? fech : null,

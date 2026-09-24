@@ -301,13 +301,13 @@ function RecorrenciaModal({
           <Field label="Categoria">
             <Select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
               <option value="">Sem categoria</option>
-              {cats.map((c) => <option key={c.id} value={c.id}>{c.icone} {c.nome}</option>)}
+              {cats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </Select>
           </Field>
           <Field label={tipo === 'receita' ? 'Recebida em' : 'Paga com'}>
             <Select value={carteiraId} disabled={travado} onChange={(e) => setCarteiraId(e.target.value)}>
               <option value="">Sem carteira</option>
-              {carteirasDisponiveis.map((c) => <option key={c.id} value={c.id}>{c.icone} {c.nome}</option>)}
+              {carteirasDisponiveis.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </Select>
           </Field>
         </div>

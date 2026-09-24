@@ -5,6 +5,8 @@ import { iso } from '@/financeiro/logic'
 import { formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import type { Meta } from '@/lib/types'
 import { Barra, Botao, BotaoIcone, Campo, Cartao, Chips, Entrada, FolhaInferior, Icone, Seletor, Tela, Vazio, num } from '~/components/ui'
+import { chaveIcone, ICONES_META, NOME_ICONE, type ChaveIcone } from '@/lib/icones'
+import { IONICONS } from '~/components/icones'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
 import { CORES_CARTEIRA, criarEstilos, f, fundoComTextoBranco, useTema } from '~/theme'
@@ -60,7 +62,7 @@ export default function Metas() {
             <Cartao key={m.id} style={{ gap: 10 }} aoTocar={() => setEditar(m)}>
               <View style={st.entre}>
                 <View style={[st.icone, { backgroundColor: `${cor}1F` }]}>
-                  <Icone nome={concluida ? 'trophy-outline' : 'flag-outline'} tamanho={20} cor={cor} />
+                  <Icone nome={concluida ? 'trophy-outline' : IONICONS[chaveIcone(m.icone, m.objetivo, 'meta')]} tamanho={20} cor={cor} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={st.nome} numberOfLines={1}>{m.objetivo}</Text>
@@ -152,6 +154,7 @@ function EditarMeta({ alvo, aoFechar }: { alvo: Meta | 'nova' | null; aoFechar: 
   const [valor, setValor] = useState('')
   const [prazo, setPrazo] = useState<string | null>(null)
   const [cor, setCor] = useState(CORES_CARTEIRA[1])
+  const [icone, setIcone] = useState<ChaveIcone>('meta')
   const [mostrarData, setMostrarData] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
@@ -162,6 +165,7 @@ function EditarMeta({ alvo, aoFechar }: { alvo: Meta | 'nova' | null; aoFechar: 
     setValor(meta ? formatNumber(Number(meta.valor_meta)) : '')
     setPrazo(meta?.prazo ?? null)
     setCor(meta?.cor ?? CORES_CARTEIRA[1])
+    setIcone(meta ? chaveIcone(meta.icone, meta.objetivo, 'meta') : 'meta')
   }
 
   function escolherPrazo() {
@@ -184,7 +188,7 @@ function EditarMeta({ alvo, aoFechar }: { alvo: Meta | 'nova' | null; aoFechar: 
     setSalvando(true)
     try {
       await salvarMeta(
-        { objetivo: objetivo.trim(), valor_meta: v, valor_atual: meta ? Number(meta.valor_atual) : 0, prazo, icone: meta?.icone ?? '🎯', cor },
+        { objetivo: objetivo.trim(), valor_meta: v, valor_atual: meta ? Number(meta.valor_atual) : 0, prazo, icone, cor },
         meta?.id,
       )
       aoFechar()
@@ -235,6 +239,20 @@ function EditarMeta({ alvo, aoFechar }: { alvo: Meta | 'nova' | null; aoFechar: 
           />
         )}
       </Campo>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="radiogroup">
+        {ICONES_META.map((i) => (
+          <Pressable
+            key={i}
+            onPress={() => setIcone(i)}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: icone === i }}
+            accessibilityLabel={NOME_ICONE[i]}
+            style={[st.iconeOpcao, icone === i && st.iconeOpcaoAtiva]}
+          >
+            <Icone nome={IONICONS[i]} tamanho={19} cor={icone === i ? cores.marcaTexto : cores.texto2} />
+          </Pressable>
+        ))}
+      </View>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         {CORES_CARTEIRA.slice(0, 6).map((c) => (
           <Pressable
@@ -271,4 +289,6 @@ const useSt = criarEstilos((cores) => ({
   pct: { fontSize: 16, ...f[800] },
   sugestao: { fontSize: 12, ...f[500], color: cores.marcaTexto, backgroundColor: cores.ativoFundo, borderRadius: 10, padding: 10 },
   cor: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  iconeOpcao: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: cores.linha, alignItems: 'center', justifyContent: 'center' },
+  iconeOpcaoAtiva: { borderColor: cores.marca, backgroundColor: cores.ativoFundo },
 }))

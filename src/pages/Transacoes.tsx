@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, SlidersHorizontal, ArrowUp, ArrowDown, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Search, SlidersHorizontal, ArrowUp, ArrowDown, Pencil, Trash2, Repeat } from 'lucide-react'
+import { IconeItem } from '@/components/IconeItem'
 import { Topbar } from '@/components/Topbar'
 import { PageBody } from '@/components/PageBody'
 import { Card, Chip, EmptyState, ErrorState, Select, Skeleton } from '@/components/ui'
@@ -123,7 +124,7 @@ export default function Transacoes({ filtroInicial }: { filtroInicial: Filtro })
                   <option value="">Todas as categorias</option>
                   {categorias.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.icone} {c.nome}
+                      {c.nome}
                     </option>
                   ))}
                 </Select>
@@ -170,18 +171,22 @@ export default function Transacoes({ filtroInicial }: { filtroInicial: Filtro })
                     <tr key={m.id} className="group border-b border-line last:border-0 hover:bg-subtle/60">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <span
-                            className={cn(
-                              'flex h-9 w-9 items-center justify-center rounded-full text-[16px]',
-                              m.tipo === 'receita' ? 'bg-success-bg' : 'bg-subtle',
-                            )}
-                          >
-                            {m.categoria?.icone ?? (m.tipo === 'receita' ? '💰' : '💳')}
-                          </span>
+                          <IconeItem
+                            icone={m.categoria?.icone}
+                            nome={m.categoria?.nome}
+                            cor={m.categoria?.cor ?? (m.tipo === 'receita' ? '#16A34A' : '#5B6576')}
+                            padrao={m.tipo === 'receita' ? 'salario' : 'etiqueta'}
+                            className="h-9 w-9 !rounded-full"
+                            tamanho={16}
+                          />
                           <div>
                             <div className="flex items-center gap-1.5 text-[14px] font-semibold text-text-1">
                               {m.descricao}
-                              {m.recorrencia_id && <span className="text-[12px]" title="Lançado por recorrência">🔁</span>}
+                              {m.recorrencia_id && (
+                                <span title="Lançado por recorrência" className="text-text-3">
+                                  <Repeat size={13} aria-label="Lançado por recorrência" />
+                                </span>
+                              )}
                             </div>
                             {m.carteira_id && (
                               <div className="text-[11px] text-text-3">

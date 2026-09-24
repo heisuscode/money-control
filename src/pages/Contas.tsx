@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Check, FileText, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Check, FileText, Pencil, Trash2, Repeat } from 'lucide-react'
 import { Topbar } from '@/components/Topbar'
 import { PageBody } from '@/components/PageBody'
 import { Button, Card, EmptyState, ErrorState, Field, Input, Skeleton } from '@/components/ui'
@@ -69,7 +69,7 @@ export default function Contas() {
             tone="danger"
             label="Atrasadas"
             value={sum(atrasadas)}
-            sub={atrasadas.length === 0 ? 'nenhuma conta atrasada 🎉' : `${atrasadas.length} conta(s) atrasada(s)`}
+            sub={atrasadas.length === 0 ? 'nenhuma conta atrasada' : `${atrasadas.length} conta(s) atrasada(s)`}
           />
           <StatusCard
             tone="warning"
@@ -130,7 +130,11 @@ export default function Contas() {
                     <div className="min-w-0 flex-1">
                       <div className={cn('flex items-center gap-1.5 text-[14px] font-semibold text-text-1', pago && 'line-through')}>
                         {c.descricao}
-                        {recorrente && <span className="text-[12px]" title="Recorrente">🔁</span>}
+                        {recorrente && (
+                          <span title="Recorrente" className="text-text-3">
+                            <Repeat size={13} aria-label="Recorrente" />
+                          </span>
+                        )}
                       </div>
                       <div
                         className={cn(
