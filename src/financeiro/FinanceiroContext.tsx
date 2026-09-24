@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useData } from '@/contexts/DataContext'
+import { runNotificationEngine } from '@/lib/notifications'
 import { supabase } from '@/lib/supabase'
 import type { Carteira, ContaVirtual, PagamentoFatura, Recorrencia } from '@/lib/types'
 import * as api from './api'
@@ -40,7 +41,7 @@ function limparPreviewLocal() {
 
 export function FinanceiroProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
-  const { despesas, reload } = useData()
+  const { despesas, notificacoes, loading: dadosCarregando, reload } = useData()
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [carteiras, setCarteiras] = useState<Carteira[]>([])
@@ -153,6 +154,23 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
     () => montarContasVirtuais(carteiras, recorrencias, despesas, pagamentosFatura),
     [carteiras, recorrencias, despesas, pagamentosFatura],
   )
+
+  // Avisos de vencimento também para faturas e recorrências (o motor do DataContext
+  // só enxerga as contas cadastradas). As chaves por id+vencimento evitam repetir.
+  useEffect(() => {
+    if (!user || loading || erro || dadosCarregando) return
+    runNotificationEngine({
+      uid: user.id,
+      contas: contasVirtuais,
+      metas: [],
+      despesas: [],
+      categorias: [],
+      existentes: notificacoes,
+    }).then((criou) => {
+      if (criou) reload(['notificacoes'])
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loading, erro, dadosCarregando, contasVirtuais])
 
   const value = useMemo<FinanceiroCtx>(
     () => ({
