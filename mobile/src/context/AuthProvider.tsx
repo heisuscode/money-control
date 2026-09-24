@@ -34,6 +34,23 @@ const REDIRECT_OAUTH = URL_RETORNO_LOGIN.startsWith('exp')
   ? `${PONTE}?volta=${encodeURIComponent(URL_RETORNO_LOGIN)}`
   : URL_RETORNO_LOGIN
 
+// O mesmo código pode chegar por dois caminhos: pela sessão do navegador
+// (entrarComGoogle) e pela rota auth-callback, que o Expo Go abre com o link.
+// Um código só pode ser trocado uma vez, então as duas pontas usam esta função.
+const trocas = new Map<string, Promise<string | null>>()
+
+export function concluirLoginGoogle(codigo: string): Promise<string | null> {
+  let troca = trocas.get(codigo)
+  if (!troca) {
+    troca = supabase.auth.exchangeCodeForSession(codigo).then(({ error }) => {
+      if (error) console.log('[google] troca do código falhou:', error.message)
+      return error ? 'Não foi possível concluir o login com Google.' : null
+    })
+    trocas.set(codigo, troca)
+  }
+  return troca
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Session | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -60,17 +77,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     if (error || !data.url) return 'Não foi possível iniciar o login com Google.'
 
+    // Registros de diagnóstico (aparecem no terminal do `expo start`); nunca o código em si.
+    console.log('[google] abrindo navegador; retorno esperado em', URL_RETORNO_LOGIN, 'via', REDIRECT_OAUTH.split('?')[0])
     const resultado = await WebBrowser.openAuthSessionAsync(data.url, URL_RETORNO_LOGIN)
-    if (resultado.type !== 'success') return null // usuário fechou o navegador
+    console.log('[google] navegador fechou:', resultado.type)
+    if (resultado.type !== 'success') {
+      // o retorno pode ter chegado pela rota auth-callback e já concluído o login
+      if ((await supabase.auth.getSession()).data.session) return null
+      return 'O login não voltou para o app. Se você escolheu a conta no Google, tente de novo; se continuar, entre com e-mail.'
+    }
 
     const { queryParams } = Linking.parse(resultado.url)
     const codigo = typeof queryParams?.code === 'string' ? queryParams.code : null
+    console.log('[google] voltou com código:', !!codigo, 'erro:', queryParams?.error ?? '-')
     if (!codigo) {
       const erro = queryParams?.error_description ?? queryParams?.error
       return erro ? `Login com Google recusado: ${String(erro)}` : 'O Google não devolveu o login. Tente de novo.'
     }
-    const troca = await supabase.auth.exchangeCodeForSession(codigo)
-    return troca.error ? 'Não foi possível concluir o login com Google.' : null
+    return concluirLoginGoogle(codigo)
   }
 
   async function cadastrar(nome: string, email: string, senha: string) {
