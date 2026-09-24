@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
+import { Pressable, RefreshControl, Text, View } from 'react-native'
 import { CURRENCIES } from '@/lib/currencies'
 import { convert, fetchRates, rateBetween, type RateMap } from '@/lib/exchange'
 import { formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import { BotaoIcone, Cartao, Chips, Entrada, Icone, Tela, TituloSecao, num } from '~/components/ui'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 export default function Cambio() {
+  const { cores } = useTema()
+  const st = useSt()
   const [taxas, setTaxas] = useState<RateMap>({})
   const [atualizando, setAtualizando] = useState(false)
   const [valor, setValor] = useState('100,00')
@@ -21,7 +23,7 @@ export default function Cambio() {
 
   // sempre busca a cotação mais recente ao abrir (como no site)
   useEffect(() => {
-    atualizar()
+    fetchRates(true).then(setTaxas)
   }, [])
 
   const pronto = Object.keys(taxas).length > 0
@@ -52,7 +54,7 @@ export default function Cambio() {
             icone="swap-vertical"
             rotulo="Inverter moedas"
             contorno
-            cor={cores.marca}
+            cor={cores.marcaTexto}
             aoTocar={() => {
               setDe(para)
               setPara(de)
@@ -118,17 +120,17 @@ export default function Cambio() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   rotulo: { fontSize: 13, ...f[600], color: cores.texto2 },
   valor: { fontSize: 24, ...f[800], fontVariant: ['tabular-nums'] },
   meio: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   traco: { flex: 1, height: 1, backgroundColor: cores.linha },
   resultado: { backgroundColor: cores.ativoFundo, borderRadius: 14, padding: 14, gap: 2 },
-  resultadoValor: { fontSize: 28, ...f[800], color: cores.marca, letterSpacing: -0.6 },
+  resultadoValor: { fontSize: 28, ...f[800], color: cores.marcaTexto, letterSpacing: -0.6 },
   sub: { fontSize: 12, ...f[400], color: cores.texto3 },
   linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, minHeight: 56 },
   divisor: { borderTopWidth: 1, borderTopColor: cores.sutil },
   bandeira: { fontSize: 26 },
   codigo: { fontSize: 14, ...f[700], color: cores.texto1 },
   variacao: { fontSize: 12, ...f[700] },
-})
+}))

@@ -19,6 +19,8 @@ let preparado: Promise<boolean> | null = null
 function notificacoes(): ModuloNotificacoes | null {
   if (semSuporte) return null
   if (!modulo) {
+    // import tardio de propósito: no Expo Go só carregar o módulo já lança erro
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     modulo = require('expo-notifications') as ModuloNotificacoes
     modulo.setNotificationHandler({
       handleNotification: async () => ({

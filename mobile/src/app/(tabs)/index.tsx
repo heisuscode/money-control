@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { resumoCartao } from '@/financeiro/logic'
 import { inMonth, sum } from '@/lib/finance'
@@ -12,9 +12,11 @@ import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
 import { lembretesDisponiveis } from '~/lib/lembretes'
 import { iniciais } from '~/lib/texto'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 export default function Inicio() {
+  const { cores } = useTema()
+  const st = useSt()
   const { nome } = useAuth()
   const d = useDados()
   const p = usePreferencias()
@@ -128,7 +130,7 @@ export default function Inicio() {
                 aoTocar={() => router.push({ pathname: '/nova-transacao', params: { tipo: 'receita' } })} />
               <Atalho icone="receipt-outline" rotulo="Pagar" cor={cores.aviso} fundo={cores.avisoFundo}
                 aoTocar={() => router.navigate('/contas')} />
-              <Atalho icone="card-outline" rotulo="Faturas" cor={cores.marca} fundo={cores.ativoFundo} aoTocar={irFaturas} />
+              <Atalho icone="card-outline" rotulo="Faturas" cor={cores.marcaTexto} fundo={cores.ativoFundo} aoTocar={irFaturas} />
             </View>
 
             <Cartao>
@@ -175,6 +177,7 @@ export default function Inicio() {
 }
 
 function Mini({ rotulo, valor, cor }: { rotulo: string; valor: string; cor: string }) {
+  const st = useSt()
   return (
     <View style={st.mini}>
       <Text style={[st.miniRotulo, { color: cor }]}>{rotulo}</Text>
@@ -184,6 +187,7 @@ function Mini({ rotulo, valor, cor }: { rotulo: string; valor: string; cor: stri
 }
 
 function Atalho({ icone, rotulo, cor, fundo, aoTocar }: { icone: NomeIcone; rotulo: string; cor: string; fundo: string; aoTocar: () => void }) {
+  const st = useSt()
   return (
     <Pressable onPress={aoTocar} accessibilityRole="button" style={({ pressed }) => [st.atalho, pressed && { opacity: 0.6 }]}>
       <View style={[st.atalhoIcone, { backgroundColor: fundo }]}>
@@ -194,7 +198,7 @@ function Atalho({ icone, rotulo, cor, fundo, aoTocar }: { icone: NomeIcone; rotu
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   tela: { flex: 1, backgroundColor: cores.fundo },
   topo: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: cores.marca, alignItems: 'center', justifyContent: 'center' },
@@ -220,4 +224,4 @@ const st = StyleSheet.create({
   cartaoFatura: { fontSize: 15, ...f[800], color: cores.texto1 },
   cartaoSub: { fontSize: 12, ...f[400], color: cores.texto3 },
   forte: { ...f[700], color: cores.texto1 },
-})
+}))

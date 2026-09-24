@@ -11,20 +11,23 @@ import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { Bloqueio } from '~/components/Bloqueio'
 import { Carregando } from '~/components/ui'
 import { AuthProvider, useAuth } from '~/context/AuthProvider'
 import { DadosProvider } from '~/context/DadosProvider'
 import { PreferenciasProvider } from '~/context/Preferencias'
-import { cores } from '~/theme'
+import { useTema } from '~/theme'
 
 SplashScreen.preventAutoHideAsync()
 
 function Navegacao() {
+  const { cores, escuro } = useTema()
   const { sessao, carregando } = useAuth()
   if (carregando) return <Carregando />
 
   return (
     <DadosProvider>
+      <StatusBar style={escuro ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: cores.fundo } }}>
         <Stack.Protected guard={!!sessao}>
           <Stack.Screen name="(tabs)" />
@@ -50,6 +53,7 @@ function Navegacao() {
         </Stack.Protected>
         <Stack.Screen name="auth-callback" />
       </Stack>
+      {sessao ? <Bloqueio /> : null}
     </DadosProvider>
   )
 }
@@ -74,7 +78,6 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <PreferenciasProvider>
         <AuthProvider>
-          <StatusBar style="dark" />
           <Navegacao />
         </AuthProvider>
       </PreferenciasProvider>

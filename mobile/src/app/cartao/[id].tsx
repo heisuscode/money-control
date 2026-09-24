@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import {
   cicloAberto,
   iso,
@@ -16,7 +16,7 @@ import { LinhaMovimentacao, PagarConta, type ContaPagavel } from '~/components/f
 import { Barra, Botao, BotaoIcone, Cartao, Segmentado, Selo, Tela, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { cores, f, fundoComTextoBranco } from '~/theme'
+import { criarEstilos, f, fundoComTextoBranco, useTema } from '~/theme'
 
 type Aba = 'atual' | 'proximas' | 'fechadas'
 
@@ -28,6 +28,8 @@ interface Previsto {
 }
 
 export default function CartaoDetalhe() {
+  const { cores } = useTema()
+  const st = useSt()
   const { id } = useLocalSearchParams<{ id: string }>()
   const d = useDados()
   const { dinheiro } = usePreferencias()
@@ -144,10 +146,10 @@ export default function CartaoDetalhe() {
           <Text style={st.forte}>Limite</Text>
           <Text style={[st.forte, num]}>{dinheiro(limite)}</Text>
         </View>
-        <Barra pct={pctFatura} extra={pctFuturo} cor={cores.marca} corExtra="#7FA8E6" altura={10} />
-        <Legenda cor={cores.marca} rotulo="Faturas em aberto" valor={dinheiro(resumo.emAberto)} />
+        <Barra pct={pctFatura} extra={pctFuturo} cor={cores.marcaTexto} corExtra={cores.parcelasFuturas} altura={10} />
+        <Legenda cor={cores.marcaTexto} rotulo="Faturas em aberto" valor={dinheiro(resumo.emAberto)} />
         {resumo.parcelasFuturas > 0 ? (
-          <Legenda cor="#7FA8E6" rotulo="Parcelas futuras" valor={dinheiro(resumo.parcelasFuturas)} />
+          <Legenda cor={cores.parcelasFuturas} rotulo="Parcelas futuras" valor={dinheiro(resumo.parcelasFuturas)} />
         ) : null}
         <Legenda cor={cores.sutil} rotulo="Disponível" valor={dinheiro(resumo.disponivel)} forte />
       </Cartao>
@@ -228,7 +230,7 @@ export default function CartaoDetalhe() {
                 {x.paga ? (
                   <Selo texto="Paga" cor={cores.sucesso} fundo={cores.sucessoFundo} />
                 ) : (
-                  <Selo texto="Pagar" cor={cores.marca} fundo={cores.ativoFundo} />
+                  <Selo texto="Pagar" cor={cores.marcaTexto} fundo={cores.ativoFundo} />
                 )}
               </View>
             </Pressable>
@@ -241,6 +243,8 @@ export default function CartaoDetalhe() {
 }
 
 function Legenda({ cor, rotulo, valor, forte }: { cor: string; rotulo: string; valor: string; forte?: boolean }) {
+  const { cores } = useTema()
+  const st = useSt()
   return (
     <View style={st.entre}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -252,7 +256,7 @@ function Legenda({ cor, rotulo, valor, forte }: { cor: string; rotulo: string; v
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   entre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   hero: { borderRadius: 22, padding: 20 },
   heroRotulo: { color: 'rgba(255,255,255,0.85)', fontSize: 12, ...f[500] },
@@ -263,4 +267,4 @@ const st = StyleSheet.create({
   sub: { fontSize: 13, ...f[400], color: cores.texto2, flexShrink: 1 },
   fechada: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 60 },
   divisor: { borderTopWidth: 1, borderTopColor: cores.sutil },
-})
+}))

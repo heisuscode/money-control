@@ -1,13 +1,13 @@
 import { router } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useState } from 'react'
+import { Alert, Pressable, Text, View } from 'react-native'
 import { numeroParcela } from '@/financeiro/logic'
 import { sum } from '@/lib/finance'
 import { daysUntil, formatCurrency, formatDate } from '@/lib/format'
 import type { Carteira, Categoria, Conta, ContaVirtual, Movimentacao, PagamentoFatura, Recorrencia } from '@/lib/types'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 import { Botao, Icone, ModalCentral, num, Selo, type NomeIcone } from './ui'
 
 export type ContaPagavel = Conta | ContaVirtual
@@ -75,6 +75,8 @@ export function LinhaConta({
   /** mostra o botão "Pagar" à direita */
   botaoPagar?: boolean
 }) {
+  const { cores } = useTema()
+  const st = useSt()
   const { dinheiro } = usePreferencias()
   const pago = conta.status === 'pago'
   const dias = daysUntil(conta.vencimento)
@@ -128,6 +130,8 @@ export function LinhaMovimentacao({
   primeira?: boolean
   aoTocar?: () => void
 }) {
+  const { cores } = useTema()
+  const st = useSt()
   const { dinheiro } = usePreferencias()
   const receita = mov.tipo === 'receita'
   const parcela = recorrencia?.parcelas_total ? `${numeroParcela(recorrencia, mov.data)}/${recorrencia.parcelas_total}` : null
@@ -171,15 +175,19 @@ export function MiniCartao({ cor, largura = 36 }: { cor: string; largura?: numbe
 
 /** Janela central para pagar uma conta, pagar fatura ou ver uma recorrência. */
 export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; aoFechar: () => void }) {
+  const { cores } = useTema()
+  const st = useSt()
   const { carteiras, pagarFatura, marcarContaPaga, receitas, despesas, pagamentosFatura } = useDados()
   const pagadoras = carteiras.filter((c) => c.tipo !== 'cartao_credito')
   const [pagadora, setPagadora] = useState('')
   const [pagando, setPagando] = useState(false)
 
-  useEffect(() => {
-    if (conta) setPagadora(pagadoras[0]?.id ?? '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conta?.id])
+  // Nova conta aberta: sugere a primeira conta bancária como pagadora.
+  const [contaAtual, setContaAtual] = useState<string | null>(null)
+  if (conta && conta.id !== contaAtual) {
+    setContaAtual(conta.id)
+    setPagadora(pagadoras[0]?.id ?? '')
+  }
 
   const virtual = conta && isVirtual(conta) ? conta : null
   const recorrencia = virtual?.origem === 'recorrencia'
@@ -269,7 +277,7 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
                     })
                   )}
                   <View style={st.aviso}>
-                    <Icone nome="information-circle-outline" tamanho={18} cor={cores.marca} />
+                    <Icone nome="information-circle-outline" tamanho={18} cor={cores.marcaTexto} />
                     <Text style={[st.texto, { flex: 1, fontSize: 12, lineHeight: 17 }]}>
                       As compras já contaram como despesa na data. Pagar a fatura só tira o dinheiro da conta: nada é
                       contado duas vezes.
@@ -288,7 +296,7 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, minHeight: 60 },
   divisor: { borderTopWidth: 1, borderTopColor: cores.sutil },
   data: { width: 44, height: 44, borderRadius: 12, backgroundColor: cores.fundo, alignItems: 'center', justifyContent: 'center' },
@@ -299,7 +307,7 @@ const st = StyleSheet.create({
   sub: { fontSize: 12, ...f[400], color: cores.texto3 },
   valor: { fontSize: 14, ...f[700], color: cores.texto1 },
   pagar: { backgroundColor: cores.ativoFundo, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
-  pagarTexto: { fontSize: 12, ...f[700], color: cores.marca },
+  pagarTexto: { fontSize: 12, ...f[700], color: cores.marcaTexto },
   texto: { fontSize: 14, ...f[400], color: cores.texto2, lineHeight: 20 },
   rotulo: { fontSize: 13, ...f[600], color: cores.texto2 },
   resumo: { alignItems: 'center', gap: 2, backgroundColor: cores.fundo, borderRadius: 16, padding: 16 },
@@ -318,4 +326,4 @@ const st = StyleSheet.create({
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: cores.desligado },
   radioAtivo: { borderColor: cores.marca, borderWidth: 6 },
   aviso: { flexDirection: 'row', gap: 8, backgroundColor: cores.ativoFundo, borderRadius: 12, padding: 10 },
-})
+}))

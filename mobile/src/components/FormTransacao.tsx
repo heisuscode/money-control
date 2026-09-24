@@ -1,13 +1,13 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
-import { useEffect, useMemo, useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useMemo, useState } from 'react'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { dividirEmParcelas, iso } from '@/financeiro/logic'
 import { formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney, todayISO } from '@/lib/format'
 import type { FrequenciaRecorrencia, Movimentacao, TipoCategoria } from '@/lib/types'
 import { useDados } from '~/context/DadosProvider'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 import { Botao, BotaoIcone, Campo, Chave, Chips, Entrada, Icone, Segmentado, Seletor } from './ui'
 
 export interface ValoresTransacao {
@@ -40,6 +40,8 @@ export function FormTransacao({
   aoSalvar: (v: ValoresTransacao) => Promise<void>
   aoExcluir?: () => void
 }) {
+  const { cores } = useTema()
+  const st = useSt()
   const { categorias, carteiras, recorrencias } = useDados()
   const [tipo, setTipo] = useState<TipoCategoria>(inicial?.tipo ?? tipoInicial)
   const [valorStr, setValorStr] = useState(inicial ? formatNumber(Number(inicial.valor)) : '')
@@ -62,23 +64,20 @@ export function FormTransacao({
   const carteira = carteiras.find((c) => c.id === carteiraId)
   const noCartao = carteira?.tipo === 'cartao_credito'
   const podeParcelar = !editando && noCartao && tipo === 'despesa'
-  const parcelado = podeParcelar && parcelas > 1
-  const divisao = useMemo(() => dividirEmParcelas(valor, Math.max(parcelas, 1)), [valor, parcelas])
+  // Mesmas regras do site: só despesa no cartão parcela; no cartão repete todo mês; parcelado não repete.
+  const parcelasEfetivas = podeParcelar ? parcelas : 1
+  const parcelado = parcelasEfetivas > 1
+  const frequenciaEfetiva: FrequenciaRecorrencia = noCartao ? 'mensal' : frequencia
+  const repetirEfetivo = !editando && !parcelado && repetir
+  const divisao = useMemo(() => dividirEmParcelas(valor, parcelasEfetivas), [valor, parcelasEfetivas])
 
-  // Mesmas regras do site: receita não vai para cartão; parcelado não repete; no cartão é mensal.
+  // Receita não vai para cartão: ao trocar o tipo, limpa categoria e o cartão escolhido.
   const [tipoAnterior, setTipoAnterior] = useState(tipo)
   if (tipoAnterior !== tipo) {
     setTipoAnterior(tipo)
     setCategoriaId('')
     if (tipo === 'receita' && noCartao) setCarteiraId('')
   }
-  useEffect(() => {
-    if (!podeParcelar) setParcelas(1)
-    if (noCartao) setFrequencia('mensal')
-  }, [podeParcelar, noCartao])
-  useEffect(() => {
-    if (parcelado) setRepetir(false)
-  }, [parcelado])
 
   function escolherData() {
     const atual = new Date(`${data}T00:00:00`)
@@ -109,7 +108,7 @@ export function FormTransacao({
         categoriaId: categoriaId || null,
         carteiraId: carteiraId || null,
         parcelas: parcelado ? parcelas : 1,
-        repetir: !editando && repetir ? frequencia : null,
+        repetir: repetirEfetivo ? frequenciaEfetiva : null,
       })
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível salvar.')
@@ -224,7 +223,7 @@ export function FormTransacao({
                       onPress={() => setParcelas((p) => Math.max(2, p - 1))}
                       accessibilityLabel="Menos parcelas"
                     >
-                      <Icone nome="remove" cor={cores.marca} tamanho={24} />
+                      <Icone nome="remove" cor={cores.marcaTexto} tamanho={24} />
                     </Pressable>
                     <View style={{ alignItems: 'center' }}>
                       <Text style={st.passoNumero}>{parcelas}x</Text>
@@ -235,12 +234,12 @@ export function FormTransacao({
                       onPress={() => setParcelas((p) => Math.min(24, p + 1))}
                       accessibilityLabel="Mais parcelas"
                     >
-                      <Icone nome="add" cor={cores.marca} tamanho={24} />
+                      <Icone nome="add" cor={cores.marcaTexto} tamanho={24} />
                     </Pressable>
                   </View>
                   {valor > 0 && (
                     <View style={st.aviso}>
-                      <Icone nome="information-circle-outline" tamanho={18} cor={cores.marca} />
+                      <Icone nome="information-circle-outline" tamanho={18} cor={cores.marcaTexto} />
                       <Text style={[st.dica, { flex: 1, color: cores.texto2 }]}>
                         {parcelas}x de {formatCurrency(divisao.valor)}
                         {divisao.ultima !== divisao.valor ? ` (última de ${formatCurrency(divisao.ultima)})` : ''}. A 1ª cai
@@ -281,7 +280,7 @@ export function FormTransacao({
 
           {editando && recorrenciaOrigem ? (
             <View style={st.aviso}>
-              <Icone nome="repeat" tamanho={18} cor={cores.marca} />
+              <Icone nome="repeat" tamanho={18} cor={cores.marcaTexto} />
               <Text style={[st.dica, { flex: 1, color: cores.texto2 }]}>
                 {recorrenciaOrigem.parcelas_total
                   ? 'Esta é uma parcela. Mudar aqui altera só este mês; as próximas seguem a compra original.'
@@ -301,7 +300,7 @@ export function FormTransacao({
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   topo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4 },
   titulo: { fontSize: 17, ...f[800], color: cores.texto1 },
   conteudo: { paddingHorizontal: 20, paddingTop: 8, gap: 18, paddingBottom: 24 },
@@ -320,4 +319,4 @@ const st = StyleSheet.create({
   aviso: { flexDirection: 'row', gap: 8, backgroundColor: cores.ativoFundo, borderRadius: 12, padding: 10 },
   rodape: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12, gap: 8, borderTopWidth: 1, borderTopColor: cores.linha, backgroundColor: cores.superficie },
   erro: { fontSize: 13, ...f[600], color: cores.perigo, textAlign: 'center' },
-})
+}))

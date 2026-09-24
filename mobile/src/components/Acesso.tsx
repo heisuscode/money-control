@@ -1,9 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { cores, f } from '~/theme'
+import { Pressable, Text, View } from 'react-native'
+import { criarEstilos, f, useTema } from '~/theme'
 import { Icone } from './ui'
 
 /** Botão "Continuar com Google" (destaque nas telas de acesso). */
 export function BotaoGoogle({ aoTocar, carregando, texto = 'Continuar com Google' }: { aoTocar: () => void; carregando?: boolean; texto?: string }) {
+  const { cores } = useTema()
+  const st = useSt()
   return (
     <Pressable
       onPress={aoTocar}
@@ -18,6 +20,7 @@ export function BotaoGoogle({ aoTocar, carregando, texto = 'Continuar com Google
 }
 
 export function Ou({ texto = 'ou com e-mail' }: { texto?: string }) {
+  const st = useSt()
   return (
     <View style={st.ou}>
       <View style={st.traco} />
@@ -29,6 +32,7 @@ export function Ou({ texto = 'ou com e-mail' }: { texto?: string }) {
 
 /** Marca do app (quadrado azul com o gráfico). */
 export function Marca({ tamanho = 56 }: { tamanho?: number }) {
+  const st = useSt()
   return (
     <View style={[st.marca, { width: tamanho, height: tamanho, borderRadius: tamanho * 0.3 }]}>
       <Icone nome="stats-chart" tamanho={tamanho * 0.5} cor="#FFFFFF" />
@@ -36,7 +40,7 @@ export function Marca({ tamanho = 56 }: { tamanho?: number }) {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   google: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -53,4 +57,4 @@ const st = StyleSheet.create({
   traco: { flex: 1, height: 1, backgroundColor: cores.linha },
   ouTexto: { fontSize: 12, ...f[500], color: cores.texto3 },
   marca: { backgroundColor: cores.marca, alignItems: 'center', justifyContent: 'center' },
-})
+}))

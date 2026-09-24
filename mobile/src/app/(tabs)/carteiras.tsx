@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
+import { Pressable, RefreshControl, Text, View } from 'react-native'
 import { resumoCartao } from '@/financeiro/logic'
 import { formatDate } from '@/lib/format'
 import type { Carteira } from '@/lib/types'
@@ -8,9 +8,11 @@ import { saldoCarteira } from '~/components/financeiro'
 import { Botao, BotaoIcone, Cartao, Carregando, Icone, Tela, TituloSecao, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { cores, f, fundoComTextoBranco } from '~/theme'
+import { criarEstilos, f, fundoComTextoBranco, useTema } from '~/theme'
 
 export default function Carteiras() {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
   const { dinheiro } = usePreferencias()
   const [atualizando, setAtualizando] = useState(false)
@@ -37,7 +39,7 @@ export default function Carteiras() {
     <Tela
       titulo="Carteiras"
       espacoAbas
-      acao={<BotaoIcone icone="add" rotulo="Nova carteira" contorno cor={cores.marca} aoTocar={nova} />}
+      acao={<BotaoIcone icone="add" rotulo="Nova carteira" contorno cor={cores.marcaTexto} aoTocar={nova} />}
       aoAtualizar={<RefreshControl refreshing={atualizando} onRefresh={atualizar} colors={[cores.marca]} />}
     >
       {d.carregando ? (
@@ -146,7 +148,7 @@ export default function Carteiras() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   entre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   patrimonio: { backgroundColor: cores.tinta, borderRadius: 22, padding: 20, gap: 4 },
   patrimonioRotulo: { color: cores.tintaTexto, fontSize: 13, ...f[500] },
@@ -160,7 +162,7 @@ const st = StyleSheet.create({
   cartaoRotulo: { color: 'rgba(255,255,255,0.85)', fontSize: 12, ...f[500] },
   cartaoValor: { color: '#FFFFFF', fontSize: 24, ...f[800], letterSpacing: -0.5, marginTop: 2 },
   cartaoBarra: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.25)', marginTop: 10, overflow: 'hidden' },
-  alerta: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF', borderRadius: 10, padding: 8, marginTop: 12 },
+  alerta: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: cores.superficie, borderRadius: 10, padding: 8, marginTop: 12 },
   alertaTexto: { fontSize: 12, ...f[600], color: cores.aviso, flex: 1 },
   linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 60 },
   divisor: { borderTopWidth: 1, borderTopColor: cores.sutil },
@@ -168,4 +170,4 @@ const st = StyleSheet.create({
   nome: { fontSize: 14, ...f[600], color: cores.texto1 },
   sub: { fontSize: 12, ...f[400], color: cores.texto3 },
   saldo: { fontSize: 15, ...f[700], color: cores.texto1 },
-})
+}))

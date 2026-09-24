@@ -1,17 +1,19 @@
 import { router } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { RefreshControl, StyleSheet, Text, View } from 'react-native'
+import { RefreshControl, Text, View } from 'react-native'
 import { sum } from '@/lib/finance'
 import { daysUntil, formatDate } from '@/lib/format'
 import { isVirtual, LinhaConta, PagarConta, type ContaPagavel } from '~/components/financeiro'
 import { Cartao, Carregando, Icone, Segmentado, Tela, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 type Filtro = 'pendentes' | 'faturas' | 'pagas'
 
 export default function Contas() {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
   const { dinheiro } = usePreferencias()
   const [filtro, setFiltro] = useState<Filtro>('pendentes')
@@ -118,6 +120,8 @@ function Resumo({
   cor: string
   fundo: string
 }) {
+  const { cores } = useTema()
+  const st = useSt()
   return (
     <Cartao style={{ flex: 1, padding: 14, gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -132,10 +136,10 @@ function Resumo({
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   mes: { fontSize: 12, ...f[700], color: cores.texto3, marginLeft: 4, textTransform: 'capitalize' },
   resumoIcone: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   rotulo: { fontSize: 12, ...f[600], color: cores.texto2, flexShrink: 1 },
   valor: { fontSize: 18, ...f[800] },
   qtd: { fontSize: 12, ...f[400], color: cores.texto3, marginTop: -4 },
-})
+}))

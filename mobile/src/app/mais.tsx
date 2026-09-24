@@ -1,12 +1,14 @@
 import { router } from 'expo-router'
-import { Alert, StyleSheet, Text, View } from 'react-native'
+import { Alert, Text, View } from 'react-native'
 import { Botao, Cartao, Grupo, ItemMenu, Tela } from '~/components/ui'
 import { useAuth } from '~/context/AuthProvider'
 import { useDados } from '~/context/DadosProvider'
 import { iniciais } from '~/lib/texto'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 export default function Mais() {
+  const { cores } = useTema()
+  const st = useSt()
   const { nome, sessao, sair, viaGoogle } = useAuth()
   const d = useDados()
   const naoLidas = d.notificacoes.filter((n) => !n.lida).length
@@ -68,10 +70,10 @@ export default function Mais() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   perfil: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: cores.marca, alignItems: 'center', justifyContent: 'center' },
   avatarTexto: { color: '#FFFFFF', fontSize: 18, ...f[800] },
   nome: { fontSize: 17, ...f[800], color: cores.texto1 },
   email: { fontSize: 13, ...f[400], color: cores.texto3 },
-})
+}))

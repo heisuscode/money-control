@@ -1,14 +1,16 @@
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { BotaoGoogle, Marca, Ou } from '~/components/Acesso'
 import { Botao, Campo, Entrada } from '~/components/ui'
 import { useAuth } from '~/context/AuthProvider'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 export default function Login() {
+  const { cores } = useTema()
+  const st = useSt()
   const { entrar, entrarComGoogle } = useAuth()
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -95,7 +97,7 @@ export default function Login() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   tela: { flexGrow: 1, justifyContent: 'center', padding: 20, gap: 20 },
   topo: { alignItems: 'center', gap: 8, marginBottom: 4 },
   nomeApp: { color: '#FFFFFF', fontSize: 26, ...f[800], letterSpacing: -0.5, marginTop: 6 },
@@ -103,8 +105,8 @@ const st = StyleSheet.create({
   caixa: { backgroundColor: cores.superficie, borderRadius: 24, padding: 20, gap: 14 },
   titulo: { fontSize: 20, ...f[800], color: cores.texto1 },
   olho: { position: 'absolute', right: 4, top: 0, bottom: 0, width: 56, alignItems: 'center', justifyContent: 'center' },
-  link: { fontSize: 13, ...f[700], color: cores.marca },
+  link: { fontSize: 13, ...f[700], color: cores.marcaTexto },
   erro: { fontSize: 13, ...f[600], color: cores.perigo },
   criar: { alignItems: 'center', paddingVertical: 8 },
   criarTexto: { color: cores.tintaTexto, fontSize: 14, ...f[500] },
-})
+}))

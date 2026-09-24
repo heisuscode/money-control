@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { router, Tabs } from 'expo-router'
 import type { ColorValue } from 'react-native'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import type { NomeIcone } from '~/components/ui'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 const icone = (nome: NomeIcone, ativo: NomeIcone) =>
   function IconeAba({ color, focused }: { color: ColorValue; focused: boolean }) {
@@ -12,6 +12,7 @@ const icone = (nome: NomeIcone, ativo: NomeIcone) =>
 
 /** "+" central: abre Nova transação de qualquer aba (não é uma aba de verdade). */
 function BotaoMais() {
+  const st = useSt()
   return (
     <View style={st.maisArea}>
       <Pressable
@@ -27,11 +28,12 @@ function BotaoMais() {
 }
 
 export default function AbasLayout() {
+  const { cores } = useTema()
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: cores.marca,
+        tabBarActiveTintColor: cores.marcaTexto,
         tabBarInactiveTintColor: cores.texto3,
         tabBarStyle: { backgroundColor: cores.superficie, borderTopColor: cores.linha },
         tabBarLabelStyle: { fontSize: 11, ...f[600] },
@@ -47,7 +49,7 @@ export default function AbasLayout() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   maisArea: { flex: 1, alignItems: 'center' },
   mais: {
     width: 56,
@@ -63,4 +65,4 @@ const st = StyleSheet.create({
     shadowRadius: 9,
     shadowOffset: { width: 0, height: 8 },
   },
-})
+}))

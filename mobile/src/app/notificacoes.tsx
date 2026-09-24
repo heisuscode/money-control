@@ -1,23 +1,26 @@
 import { router, type Href } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
+import { Pressable, RefreshControl, Text, View } from 'react-native'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Notificacao, TipoNotificacao } from '@/lib/types'
 import { Botao, Cartao, Icone, ItemMenu, Tela, Vazio, type NomeIcone } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema, type Cores } from '~/theme'
 
-const TIPO: Record<TipoNotificacao, { icone: NomeIcone; cor: string; fundo: string; destino: Href }> = {
+const tipos = (cores: Cores): Record<TipoNotificacao, { icone: NomeIcone; cor: string; fundo: string; destino: Href }> => ({
   vencimento: { icone: 'receipt-outline', cor: cores.aviso, fundo: cores.avisoFundo, destino: '/contas' },
-  credito: { icone: 'card-outline', cor: cores.marca, fundo: cores.ativoFundo, destino: '/carteiras' },
+  credito: { icone: 'card-outline', cor: cores.marcaTexto, fundo: cores.ativoFundo, destino: '/carteiras' },
   orcamento: { icone: 'pie-chart-outline', cor: cores.perigo, fundo: cores.perigoFundo, destino: '/categorias' },
   meta: { icone: 'flag-outline', cor: cores.sucesso, fundo: cores.sucessoFundo, destino: '/metas' },
   cambio: { icone: 'swap-horizontal-outline', cor: cores.texto2, fundo: cores.sutil, destino: '/cambio' },
-}
+})
 
 export default function Notificacoes() {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
+  const TIPO = tipos(cores)
   const [atualizando, setAtualizando] = useState(false)
   const naoLidas = d.notificacoes.filter((n) => !n.lida)
 
@@ -89,13 +92,13 @@ export default function Notificacoes() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   linha: { flexDirection: 'row', gap: 12, paddingVertical: 12, paddingHorizontal: 16 },
   divisor: { borderTopWidth: 1, borderTopColor: cores.sutil },
-  naoLida: { backgroundColor: '#F5F8FF' },
+  naoLida: { backgroundColor: cores.destaqueFundo },
   icone: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   titulo: { fontSize: 14, ...f[600], color: cores.texto1, flexShrink: 1 },
   ponto: { width: 8, height: 8, borderRadius: 4, backgroundColor: cores.marca },
   descricao: { fontSize: 13, ...f[400], color: cores.texto2, lineHeight: 18 },
   quando: { fontSize: 11, ...f[500], color: cores.texto3 },
-})
+}))

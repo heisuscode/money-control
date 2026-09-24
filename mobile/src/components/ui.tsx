@@ -6,7 +6,6 @@ import {
   Modal,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -17,12 +16,13 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { cores, f, raio } from '~/theme'
+import { criarEstilos, f, raio, useTema } from '~/theme'
 
 export type NomeIcone = ComponentProps<typeof Ionicons>['name']
 
-export function Icone({ nome, tamanho = 22, cor = cores.texto2 }: { nome: NomeIcone; tamanho?: number; cor?: string }) {
-  return <Ionicons name={nome} size={tamanho} color={cor} />
+export function Icone({ nome, tamanho = 22, cor }: { nome: NomeIcone; tamanho?: number; cor?: string }) {
+  const { cores } = useTema()
+  return <Ionicons name={nome} size={tamanho} color={cor ?? cores.texto2} />
 }
 
 /** Botão quadrado de 44 px só com ícone (voltar, sininho, editar...). */
@@ -41,6 +41,7 @@ export function BotaoIcone({
   cor?: string
   children?: ReactNode
 }) {
+  const s = useS()
   return (
     <Pressable
       onPress={aoTocar}
@@ -69,7 +70,7 @@ export function Tela({
   rolar = true,
   aoAtualizar,
   rodape,
-  fundo = cores.fundo,
+  fundo,
   espacoAbas,
 }: {
   titulo?: string
@@ -87,6 +88,8 @@ export function Tela({
   /** telas das abas: deixa espaço para a barra inferior */
   espacoAbas?: boolean
 }) {
+  const s = useS()
+  const { cores } = useTema()
   const topo = cabecalho ?? (
     <View style={s.topo}>
       {voltar ? <BotaoIcone icone="chevron-back" rotulo="Voltar" aoTocar={() => router.back()} /> : null}
@@ -99,7 +102,7 @@ export function Tela({
   )
   const conteudo = [s.conteudo, espacoAbas && { paddingBottom: 24 }, rodape ? { paddingBottom: 24 } : null]
   return (
-    <SafeAreaView style={[s.tela, { backgroundColor: fundo }]} edges={espacoAbas ? ['top'] : ['top', 'bottom']}>
+    <SafeAreaView style={[s.tela, { backgroundColor: fundo ?? cores.fundo }]} edges={espacoAbas ? ['top'] : ['top', 'bottom']}>
       {topo}
       {rolar ? (
         <ScrollView contentContainerStyle={conteudo} refreshControl={aoAtualizar} keyboardShouldPersistTaps="handled">
@@ -114,6 +117,7 @@ export function Tela({
 }
 
 export function Cartao({ children, style, aoTocar }: { children: ReactNode; style?: StyleProp<ViewStyle>; aoTocar?: () => void }) {
+  const s = useS()
   if (aoTocar) {
     return (
       <Pressable onPress={aoTocar} style={({ pressed }) => [s.cartao, style, pressed && { opacity: 0.8 }]}>
@@ -125,6 +129,7 @@ export function Cartao({ children, style, aoTocar }: { children: ReactNode; styl
 }
 
 export function TituloSecao({ children, acao, aoTocarAcao }: { children: ReactNode; acao?: string; aoTocarAcao?: () => void }) {
+  const s = useS()
   return (
     <View style={s.secao}>
       <Text style={s.secaoTexto} accessibilityRole="header">{children}</Text>
@@ -139,10 +144,12 @@ export function TituloSecao({ children, acao, aoTocarAcao }: { children: ReactNo
 
 /** Rótulo pequeno em caixa alta que separa grupos (ex.: "LEMBRETES"). */
 export function Grupo({ children }: { children: ReactNode }) {
+  const s = useS()
   return <Text style={s.grupo}>{String(children).toUpperCase()}</Text>
 }
 
 export function Divisor() {
+  const s = useS()
   return <View style={s.divisor} />
 }
 
@@ -165,6 +172,8 @@ export function Botao({
   icone?: NomeIcone
   style?: StyleProp<ViewStyle>
 }) {
+  const { cores } = useTema()
+  const s = useS()
   const inativo = desabilitado || carregando
   const corTexto =
     variante === 'primario' || variante === 'perigo'
@@ -172,7 +181,7 @@ export function Botao({
       : variante === 'contornoPerigo'
         ? cores.perigo
         : variante === 'texto'
-          ? cores.marca
+          ? cores.marcaTexto
           : cores.texto1
   return (
     <Pressable
@@ -188,6 +197,7 @@ export function Botao({
 }
 
 export function Campo({ rotulo, dica, erro, children }: { rotulo: string; dica?: string; erro?: string | null; children: ReactNode }) {
+  const s = useS()
   return (
     <View style={{ gap: 6 }}>
       <Text style={s.rotulo}>{rotulo}</Text>
@@ -198,11 +208,15 @@ export function Campo({ rotulo, dica, erro, children }: { rotulo: string; dica?:
 }
 
 export function Entrada(props: TextInputProps) {
+  const { cores } = useTema()
+  const s = useS()
   return <TextInput placeholderTextColor={cores.texto3} {...props} style={[s.entrada, props.style]} />
 }
 
 /** Campo que parece entrada mas abre um seletor (data, conta...). */
 export function Seletor({ texto, icone, aoTocar }: { texto: string; icone?: NomeIcone; aoTocar: () => void }) {
+  const { cores } = useTema()
+  const s = useS()
   return (
     <Pressable onPress={aoTocar} style={({ pressed }) => [s.seletor, pressed && { opacity: 0.7 }]}>
       {icone ? <Icone nome={icone} tamanho={18} cor={cores.texto3} /> : null}
@@ -232,6 +246,7 @@ export function Chips<T extends string | number>({
   /** quebra em várias linhas em vez de rolar para o lado */
   quebrar?: boolean
 }) {
+  const s = useS()
   const itens = opcoes.map((o) => {
     const ativo = o.valor === valor
     return (
@@ -267,6 +282,8 @@ export function Segmentado<T extends string>({
   /** cor do texto ativo por opção (ex.: despesa vermelha, receita verde) */
   cores?: Partial<Record<T, string>>
 }) {
+  const { cores } = useTema()
+  const s = useS()
   return (
     <View style={s.segmentado} accessibilityRole="radiogroup">
       {opcoes.map((o) => {
@@ -279,7 +296,7 @@ export function Segmentado<T extends string>({
             accessibilityState={{ checked: ativo }}
             style={[s.segmento, ativo && s.segmentoAtivo]}
           >
-            <Text style={[s.segmentoTexto, ativo && { color: corAtiva?.[o.valor] ?? cores.marca, ...f[700] }]}>{o.rotulo}</Text>
+            <Text style={[s.segmentoTexto, ativo && { color: corAtiva?.[o.valor] ?? cores.marcaTexto, ...f[700] }]}>{o.rotulo}</Text>
           </Pressable>
         )
       })}
@@ -289,6 +306,8 @@ export function Segmentado<T extends string>({
 
 /** Chave liga/desliga no estilo do protótipo. */
 export function Chave({ valor, aoMudar, rotulo }: { valor: boolean; aoMudar: (v: boolean) => void; rotulo: string }) {
+  const { cores } = useTema()
+  const s = useS()
   return (
     <Pressable
       onPress={() => aoMudar(!valor)}
@@ -306,7 +325,7 @@ export function Chave({ valor, aoMudar, rotulo }: { valor: boolean; aoMudar: (v:
 /** Barra de progresso; `extra` desenha um segundo trecho (ex.: parcelas futuras). */
 export function Barra({
   pct,
-  cor = cores.marca,
+  cor: corBarra,
   extra,
   corExtra,
   altura = 8,
@@ -317,6 +336,9 @@ export function Barra({
   corExtra?: string
   altura?: number
 }) {
+  const s = useS()
+  const { cores } = useTema()
+  const cor = corBarra ?? cores.marca
   const a = Math.max(0, Math.min(100, pct))
   const b = Math.max(0, Math.min(100 - a, extra ?? 0))
   return (
@@ -328,10 +350,12 @@ export function Barra({
 }
 
 /** Selo pequeno (ex.: "3/10", "Atrasada"). */
-export function Selo({ texto, cor = cores.texto2, fundo = cores.sutil }: { texto: string; cor?: string; fundo?: string }) {
+export function Selo({ texto, cor, fundo }: { texto: string; cor?: string; fundo?: string }) {
+  const s = useS()
+  const { cores } = useTema()
   return (
-    <View style={[s.selo, { backgroundColor: fundo }]}>
-      <Text style={[s.seloTexto, { color: cor }]}>{texto}</Text>
+    <View style={[s.selo, { backgroundColor: fundo ?? cores.sutil }]}>
+      <Text style={[s.seloTexto, { color: cor ?? cores.texto2 }]}>{texto}</Text>
     </View>
   )
 }
@@ -342,8 +366,8 @@ export function ItemMenu({
   titulo,
   detalhe,
   aoTocar,
-  corIcone = cores.marca,
-  fundoIcone = cores.ativoFundo,
+  corIcone,
+  fundoIcone,
   primeiro,
   direita,
 }: {
@@ -356,14 +380,16 @@ export function ItemMenu({
   primeiro?: boolean
   direita?: ReactNode
 }) {
+  const { cores } = useTema()
+  const s = useS()
   return (
     <Pressable
       onPress={aoTocar}
       disabled={!aoTocar}
       style={({ pressed }) => [s.itemMenu, !primeiro && s.itemMenuDivisor, pressed && { opacity: 0.6 }]}
     >
-      <View style={[s.itemMenuIcone, { backgroundColor: fundoIcone }]}>
-        <Icone nome={icone} tamanho={19} cor={corIcone} />
+      <View style={[s.itemMenuIcone, { backgroundColor: fundoIcone ?? cores.ativoFundo }]}>
+        <Icone nome={icone} tamanho={19} cor={corIcone ?? cores.marcaTexto} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.itemMenuTitulo}>{titulo}</Text>
@@ -375,11 +401,13 @@ export function ItemMenu({
 }
 
 export function Vazio({ titulo, descricao, acao, icone }: { titulo: string; descricao?: string; acao?: ReactNode; icone?: NomeIcone }) {
+  const { cores } = useTema()
+  const s = useS()
   return (
     <View style={s.vazio}>
       {icone ? (
         <View style={s.vazioIcone}>
-          <Icone nome={icone} tamanho={26} cor={cores.marca} />
+          <Icone nome={icone} tamanho={26} cor={cores.marcaTexto} />
         </View>
       ) : null}
       <Text style={s.vazioTitulo}>{titulo}</Text>
@@ -390,6 +418,7 @@ export function Vazio({ titulo, descricao, acao, icone }: { titulo: string; desc
 }
 
 export function Carregando() {
+  const { cores } = useTema()
   return (
     <View style={{ padding: 40, alignItems: 'center' }}>
       <ActivityIndicator color={cores.marca} size="large" />
@@ -409,6 +438,7 @@ export function ModalCentral({
   titulo: string
   children: ReactNode
 }) {
+  const s = useS()
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={aoFechar} statusBarTranslucent>
       <Pressable style={s.modalFundo} onPress={aoFechar}>
@@ -436,6 +466,7 @@ export function FolhaInferior({
   titulo: string
   children: ReactNode
 }) {
+  const s = useS()
   const insets = useSafeAreaInsets()
   return (
     <Modal visible={visivel} transparent animationType="slide" onRequestClose={aoFechar} statusBarTranslucent>
@@ -452,7 +483,7 @@ export function FolhaInferior({
 
 export const num: TextStyle = { fontVariant: ['tabular-nums'] }
 
-export const s = StyleSheet.create({
+const useS = criarEstilos((cores) => ({
   tela: { flex: 1 },
   topo: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   titulo: { fontSize: 22, ...f[800], color: cores.texto1, letterSpacing: -0.4 },
@@ -469,7 +500,7 @@ export const s = StyleSheet.create({
   },
   secao: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   secaoTexto: { fontSize: 15, ...f[700], color: cores.texto1 },
-  link: { fontSize: 13, ...f[700], color: cores.marca },
+  link: { fontSize: 13, ...f[700], color: cores.marcaTexto },
   grupo: { fontSize: 12, ...f[700], color: cores.texto3, letterSpacing: 0.4, marginTop: 4 },
   divisor: { height: 1, backgroundColor: cores.sutil },
   botaoIcone: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -529,7 +560,7 @@ export const s = StyleSheet.create({
   chipAtivo: { borderColor: cores.marca, backgroundColor: cores.ativoFundo },
   chipCor: { width: 10, height: 10, borderRadius: 5 },
   chipTexto: { fontSize: 13, color: cores.texto2, ...f[600] },
-  chipTextoAtivo: { color: cores.marca, ...f[700] },
+  chipTextoAtivo: { color: cores.marcaTexto, ...f[700] },
   segmentado: { flexDirection: 'row', backgroundColor: cores.sutil, borderRadius: 12, padding: 4, gap: 4 },
   segmento: { flex: 1, height: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   segmentoAtivo: { backgroundColor: cores.superficie, elevation: 1 },
@@ -554,4 +585,4 @@ export const s = StyleSheet.create({
   folha: { backgroundColor: cores.superficie, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 10, gap: 14 },
   folhaPuxador: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: cores.borda, marginBottom: 6 },
   num,
-})
+}))

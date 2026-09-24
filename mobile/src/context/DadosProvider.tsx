@@ -72,10 +72,44 @@ async function carregarMovimentacoes(uid: string, tabela: 'receitas' | 'despesas
   return (data ?? []).map((r) => ({ ...r, tipo: tabela === 'receitas' ? 'receita' : 'despesa' })) as Movimentacao[]
 }
 
+interface Tudo {
+  categorias: Categoria[]
+  receitas: Movimentacao[]
+  despesas: Movimentacao[]
+  contas: Conta[]
+  fin: api.DadosFinanceiros
+  metas: Meta[]
+  notificacoes: Notificacao[]
+}
+
+async function buscarTudo(uid: string): Promise<Tudo> {
+  const [cats, rec, des, cts, fin, mts, nts] = await Promise.all([
+    supabase.from('categorias').select('*').eq('usuario_id', uid).order('nome'),
+    carregarMovimentacoes(uid, 'receitas'),
+    carregarMovimentacoes(uid, 'despesas'),
+    supabase.from('contas').select('*').eq('usuario_id', uid).order('vencimento'),
+    api.carregarFinanceiro(supabase, uid),
+    supabase.from('metas').select('*').eq('usuario_id', uid).order('criado_em', { ascending: false }),
+    supabase.from('notificacoes').select('*').eq('usuario_id', uid).order('criado_em', { ascending: false }).limit(100),
+  ])
+  for (const r of [cats, cts, mts, nts]) if (r.error) throw r.error
+  return {
+    categorias: (cats.data ?? []) as Categoria[],
+    receitas: rec,
+    despesas: des,
+    // conta pendente com vencimento passado aparece como atrasada (como no site)
+    contas: ((cts.data ?? []) as Conta[]).map((c) =>
+      c.status === 'pendente' && daysUntil(c.vencimento) < 0 ? { ...c, status: 'atrasado' as const } : c,
+    ),
+    fin,
+    metas: (mts.data ?? []) as Meta[],
+    notificacoes: (nts.data ?? []) as Notificacao[],
+  }
+}
+
 export function DadosProvider({ children }: { children: ReactNode }) {
   const { sessao } = useAuth()
   const uid = sessao?.user.id
-  const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [receitas, setReceitas] = useState<Movimentacao[]>([])
@@ -89,47 +123,42 @@ export function DadosProvider({ children }: { children: ReactNode }) {
   const { lembretes } = usePreferencias()
   const lancando = useRef(false)
 
+  const aplicar = useCallback((t: Tudo) => {
+    setMetas(t.metas)
+    setNotificacoes(t.notificacoes)
+    setCategorias(t.categorias)
+    setReceitas(t.receitas)
+    setDespesas(t.despesas)
+    setContas(t.contas)
+    setCarteiras(t.fin.carteiras)
+    setRecorrencias(t.fin.recorrencias)
+    setPagamentos(t.fin.pagamentos)
+    setErro(null)
+  }, [])
+
+  const falhar = useCallback((e: unknown) => {
+    console.error(e)
+    setErro('Não foi possível carregar seus dados. Verifique a conexão e puxe para atualizar.')
+  }, [])
+
   const recarregar = useCallback(async () => {
     if (!uid) return
-    try {
-      const [cats, rec, des, cts, fin, mts, nts] = await Promise.all([
-        supabase.from('categorias').select('*').eq('usuario_id', uid).order('nome'),
-        carregarMovimentacoes(uid, 'receitas'),
-        carregarMovimentacoes(uid, 'despesas'),
-        supabase.from('contas').select('*').eq('usuario_id', uid).order('vencimento'),
-        api.carregarFinanceiro(supabase, uid),
-        supabase.from('metas').select('*').eq('usuario_id', uid).order('criado_em', { ascending: false }),
-        supabase.from('notificacoes').select('*').eq('usuario_id', uid).order('criado_em', { ascending: false }).limit(100),
-      ])
-      if (cats.error) throw cats.error
-      if (cts.error) throw cts.error
-      if (mts.error) throw mts.error
-      if (nts.error) throw nts.error
-      setMetas((mts.data ?? []) as Meta[])
-      setNotificacoes((nts.data ?? []) as Notificacao[])
-      setCategorias((cats.data ?? []) as Categoria[])
-      setReceitas(rec)
-      setDespesas(des)
-      // conta pendente com vencimento passado aparece como atrasada (como no site)
-      setContas(
-        ((cts.data ?? []) as Conta[]).map((c) =>
-          c.status === 'pendente' && daysUntil(c.vencimento) < 0 ? { ...c, status: 'atrasado' } : c,
-        ),
-      )
-      setCarteiras(fin.carteiras)
-      setRecorrencias(fin.recorrencias)
-      setPagamentos(fin.pagamentos)
-      setErro(null)
-    } catch (e) {
-      console.error(e)
-      setErro('Não foi possível carregar seus dados. Verifique a conexão e puxe para atualizar.')
-    }
-  }, [uid])
+    await buscarTudo(uid).then(aplicar, falhar)
+  }, [uid, aplicar, falhar])
 
+  // Primeira busca deste usuário: "carregando" até ela terminar.
+  const [carregadoPara, setCarregadoPara] = useState<string | null>(null)
+  const carregando = !!uid && carregadoPara !== uid
   useEffect(() => {
-    setCarregando(true)
-    recarregar().finally(() => setCarregando(false))
-  }, [recarregar])
+    if (!uid) return
+    let vivo = true
+    buscarTudo(uid)
+      .then((t) => vivo && aplicar(t), (e) => vivo && falhar(e))
+      .finally(() => vivo && setCarregadoPara(uid))
+    return () => {
+      vivo = false
+    }
+  }, [uid, aplicar, falhar])
 
   // Volta ao app: busca de novo (algo pode ter sido lançado pelo site).
   useEffect(() => {

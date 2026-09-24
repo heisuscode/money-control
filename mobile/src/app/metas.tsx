@@ -1,13 +1,13 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import { useState } from 'react'
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, Platform, Pressable, Text, View } from 'react-native'
 import { iso } from '@/financeiro/logic'
 import { formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import type { Meta } from '@/lib/types'
 import { Barra, Botao, BotaoIcone, Campo, Cartao, Chips, Entrada, FolhaInferior, Icone, Seletor, Tela, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { CORES_CARTEIRA, cores, f, fundoComTextoBranco } from '~/theme'
+import { CORES_CARTEIRA, criarEstilos, f, fundoComTextoBranco, useTema } from '~/theme'
 
 function mesesAte(prazo: string) {
   const hoje = new Date()
@@ -16,6 +16,8 @@ function mesesAte(prazo: string) {
 }
 
 export default function Metas() {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
   const { dinheiro } = usePreferencias()
   const [aporte, setAporte] = useState<Meta | null>(null)
@@ -28,7 +30,7 @@ export default function Metas() {
     <Tela
       titulo="Metas"
       voltar
-      acao={<BotaoIcone icone="add" rotulo="Nova meta" contorno cor={cores.marca} aoTocar={() => setEditar('nova')} />}
+      acao={<BotaoIcone icone="add" rotulo="Nova meta" contorno cor={cores.marcaTexto} aoTocar={() => setEditar('nova')} />}
     >
       <View style={st.hero}>
         <Text style={st.heroRotulo}>Total guardado</Text>
@@ -93,6 +95,7 @@ export default function Metas() {
 }
 
 function Aporte({ meta, aoFechar }: { meta: Meta | null; aoFechar: () => void }) {
+  const st = useSt()
   const { salvarMeta } = useDados()
   const [valor, setValor] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -140,6 +143,8 @@ const campos = (m: Meta) => ({
 })
 
 function EditarMeta({ alvo, aoFechar }: { alvo: Meta | 'nova' | null; aoFechar: () => void }) {
+  const { cores } = useTema()
+  const st = useSt()
   const { salvarMeta, removerMeta } = useDados()
   const meta = alvo && alvo !== 'nova' ? alvo : null
   const [chave, setChave] = useState<string | null>(null)
@@ -254,7 +259,7 @@ function EditarMeta({ alvo, aoFechar }: { alvo: Meta | 'nova' | null; aoFechar: 
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   entre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   hero: { backgroundColor: cores.tinta, borderRadius: 22, padding: 20, gap: 2 },
   heroRotulo: { color: cores.tintaTexto, fontSize: 13, ...f[500] },
@@ -264,6 +269,6 @@ const st = StyleSheet.create({
   sub: { fontSize: 12, ...f[400], color: cores.texto3 },
   forte: { ...f[700], color: cores.texto1 },
   pct: { fontSize: 16, ...f[800] },
-  sugestao: { fontSize: 12, ...f[500], color: cores.marca, backgroundColor: cores.ativoFundo, borderRadius: 10, padding: 10 },
+  sugestao: { fontSize: 12, ...f[500], color: cores.marcaTexto, backgroundColor: cores.ativoFundo, borderRadius: 10, padding: 10 },
   cor: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-})
+}))

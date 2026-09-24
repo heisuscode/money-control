@@ -1,16 +1,17 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, Text, View } from 'react-native'
 import { formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import type { TipoCarteira } from '@/lib/types'
 import { Botao, Campo, Entrada, Icone, Segmentado, Tela } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
-import { CORES_CARTEIRA, cores, f, fundoComTextoBranco } from '~/theme'
+import { CORES_CARTEIRA, criarEstilos, f, fundoComTextoBranco } from '~/theme'
 
 // O banco guarda um emoji por carteira (o site mostra); o app desenha ícones.
 const ICONE: Record<TipoCarteira, string> = { conta: '🏦', dinheiro: '💵', cartao_credito: '💳' }
 
 export default function NovaCarteira() {
+  const st = useSt()
   const { id } = useLocalSearchParams<{ id?: string }>()
   const { carteiras, salvarCarteira, removerCarteira } = useDados()
   const existente = id ? carteiras.find((c) => c.id === id) : undefined
@@ -171,7 +172,7 @@ export default function NovaCarteira() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   entre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   previa: { borderRadius: 20, padding: 18, height: 170 },
   previaNome: { color: '#FFFFFF', fontSize: 16, ...f[700], flex: 1 },
@@ -181,4 +182,4 @@ const st = StyleSheet.create({
   corAtiva: { borderWidth: 3, borderColor: cores.superficie, outlineColor: cores.texto1, outlineWidth: 2 },
   dica: { fontSize: 12, ...f[400], color: cores.texto3, marginTop: -6 },
   erro: { fontSize: 13, ...f[600], color: cores.perigo, textAlign: 'center' },
-})
+}))

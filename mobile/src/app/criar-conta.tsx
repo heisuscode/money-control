@@ -1,10 +1,10 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import { BotaoGoogle, Ou } from '~/components/Acesso'
 import { Botao, Campo, Entrada, Icone, Tela } from '~/components/ui'
 import { useAuth } from '~/context/AuthProvider'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema, type Cores } from '~/theme'
 
 /** 0–4: tamanho, número, maiúscula e símbolo. */
 function forca(senha: string) {
@@ -15,7 +15,7 @@ function forca(senha: string) {
   if (/[^A-Za-z0-9]/.test(senha)) pontos++
   return senha.length < 6 ? Math.min(pontos, 1) : pontos
 }
-const NIVEIS = [
+const niveis = (cores: Cores) => [
   { texto: 'Muito fraca', cor: cores.perigo },
   { texto: 'Fraca', cor: cores.perigo },
   { texto: 'Razoável', cor: cores.aviso },
@@ -24,6 +24,8 @@ const NIVEIS = [
 ]
 
 export default function CriarConta() {
+  const { cores } = useTema()
+  const st = useSt()
   const { cadastrar, entrarComGoogle } = useAuth()
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
@@ -33,6 +35,7 @@ export default function CriarConta() {
   const [google, setGoogle] = useState(false)
   const [confirmar, setConfirmar] = useState(false)
   const nivel = forca(senha)
+  const NIVEIS = niveis(cores)
 
   async function comGoogle() {
     setErro(null)
@@ -101,7 +104,7 @@ export default function CriarConta() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   titulo: { fontSize: 26, ...f[800], color: cores.texto1, letterSpacing: -0.5 },
   texto: { fontSize: 15, ...f[400], color: cores.texto2, lineHeight: 22, marginTop: -6 },
   icone: { width: 64, height: 64, borderRadius: 20, backgroundColor: cores.sucessoFundo, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
@@ -109,4 +112,4 @@ const st = StyleSheet.create({
   forcaParte: { flex: 1, height: 5, borderRadius: 3 },
   forcaTexto: { fontSize: 12, ...f[700] },
   erro: { fontSize: 13, ...f[600], color: cores.perigo },
-})
+}))

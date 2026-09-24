@@ -1,10 +1,11 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import { formatDate } from '@/lib/format'
-import { cores, f } from '~/theme'
+import { criarEstilos, f } from '~/theme'
 import { BotaoIcone } from './ui'
 
 /** "‹ setembro 2026 ›" — troca o mês exibido. */
 export function SeletorMes({ mes, aoMudar }: { mes: Date; aoMudar: (d: Date) => void }) {
+  const st = useSt()
   const mover = (delta: number) => aoMudar(new Date(mes.getFullYear(), mes.getMonth() + delta, 1))
   return (
     <View style={st.caixa}>
@@ -15,7 +16,7 @@ export function SeletorMes({ mes, aoMudar }: { mes: Date; aoMudar: (d: Date) => 
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   caixa: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -28,4 +29,4 @@ const st = StyleSheet.create({
     height: 52,
   },
   texto: { fontSize: 15, ...f[700], color: cores.texto1, textTransform: 'capitalize' },
-})
+}))

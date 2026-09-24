@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import { iso } from '@/financeiro/logic'
 import { sum } from '@/lib/finance'
 import { formatDate } from '@/lib/format'
@@ -9,11 +9,13 @@ import { SeletorMes } from '~/components/SeletorMes'
 import { Cartao, Tela, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 const SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 
 export default function Calendario() {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
   const { dinheiro } = usePreferencias()
   const [mes, setMes] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
@@ -76,7 +78,7 @@ export default function Calendario() {
                 style={st.celula}
               >
                 <View style={[st.numero, c === hoje && st.hoje, selecionado && st.selecionado]}>
-                  <Text style={[st.numeroTexto, selecionado && { color: '#FFFFFF' }, c === hoje && !selecionado && { color: cores.marca }]}>
+                  <Text style={[st.numeroTexto, selecionado && { color: '#FFFFFF' }, c === hoje && !selecionado && { color: cores.marcaTexto }]}>
                     {Number(c.slice(8))}
                   </Text>
                 </View>
@@ -109,6 +111,7 @@ export default function Calendario() {
 }
 
 function Legenda({ cor, texto }: { cor: string; texto: string }) {
+  const st = useSt()
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <View style={[st.ponto, { backgroundColor: cor }]} />
@@ -117,7 +120,7 @@ function Legenda({ cor, texto }: { cor: string; texto: string }) {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   entre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   grade: { flexDirection: 'row', flexWrap: 'wrap' },
   semana: { width: `${100 / 7}%`, textAlign: 'center', fontSize: 12, ...f[700], color: cores.texto3, paddingBottom: 6 },
@@ -130,4 +133,4 @@ const st = StyleSheet.create({
   legenda: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 8 },
   titulo: { fontSize: 15, ...f[700], color: cores.texto1, textTransform: 'capitalize', flexShrink: 1 },
   sub: { fontSize: 12, ...f[400], color: cores.texto3 },
-})
+}))

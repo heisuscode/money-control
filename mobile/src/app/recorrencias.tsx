@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, Text, View } from 'react-native'
 import { parcelasLancadas, proximaOcorrencia, recorrenciaConcluida } from '@/financeiro/logic'
 import { formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import type { Recorrencia } from '@/lib/types'
@@ -8,7 +8,7 @@ import { iconeCategoria } from '~/components/financeiro'
 import { Botao, Campo, Cartao, Chave, Chips, Entrada, FolhaInferior, Icone, Selo, Tela, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 const FREQ = { mensal: 'Todo mês', semanal: 'Toda semana', anual: 'Todo ano' } as const
 
@@ -24,6 +24,8 @@ function paraInput(r: Recorrencia): RecorrenciaInput {
 }
 
 export default function Recorrencias() {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
   const { dinheiro } = usePreferencias()
   const [editando, setEditando] = useState<Recorrencia | null>(null)
@@ -110,6 +112,8 @@ export default function Recorrencias() {
 }
 
 function EditarRecorrencia({ rec, aoFechar }: { rec: Recorrencia | null; aoFechar: () => void }) {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
   const [descricao, setDescricao] = useState('')
   const [valor, setValor] = useState('')
@@ -198,7 +202,7 @@ function EditarRecorrencia({ rec, aoFechar }: { rec: Recorrencia | null; aoFecha
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   resumo: { flex: 1, padding: 14 },
   resumoRotulo: { fontSize: 12, ...f[600], color: cores.texto2 },
   resumoValor: { fontSize: 18, ...f[800], marginTop: 4 },
@@ -210,4 +214,4 @@ const st = StyleSheet.create({
   descricao: { fontSize: 14, ...f[600], color: cores.texto1, flexShrink: 1 },
   sub: { fontSize: 12, ...f[400], color: cores.texto3 },
   valor: { fontSize: 13, ...f[700], color: cores.texto1 },
-})
+}))

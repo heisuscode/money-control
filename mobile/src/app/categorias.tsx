@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, Text, View } from 'react-native'
 import { inMonth, sum } from '@/lib/finance'
 import { formatCurrency, formatNumber, inMonthName, maskMoneyInput, parseMoney } from '@/lib/format'
 import type { Categoria } from '@/lib/types'
@@ -7,14 +7,16 @@ import { iconeCategoria } from '~/components/financeiro'
 import { Barra, Botao, Campo, Cartao, Entrada, FolhaInferior, Icone, Tela, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema, type Cores } from '~/theme'
 
 /** Âmbar a partir de 80% do orçamento; vermelho quando estoura. */
-function corUso(pct: number) {
+function corUso(pct: number, cores: Cores) {
   return pct > 100 ? cores.perigo : pct >= 80 ? cores.aviso : cores.sucesso
 }
 
 export default function Categorias() {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
   const { dinheiro } = usePreferencias()
   const [editando, setEditando] = useState<Categoria | null>(null)
@@ -48,7 +50,7 @@ export default function Categorias() {
               <Text style={[st.grande, num]}>{dinheiro(totalGasto)}</Text>
               <Text style={[st.sub, num]}>de {dinheiro(totalOrc)}</Text>
             </View>
-            <Barra pct={pctTotal} cor={corUso(pctTotal)} altura={10} />
+            <Barra pct={pctTotal} cor={corUso(pctTotal, cores)} altura={10} />
             <Text style={st.sub}>
               {totalGasto <= totalOrc
                 ? `Ainda pode gastar ${dinheiro(totalOrc - totalGasto)} nas categorias com limite.`
@@ -78,7 +80,7 @@ export default function Categorias() {
                 </View>
                 <Text style={st.nome} numberOfLines={1}>{c.nome}</Text>
                 {orc > 0 && pct >= 80 ? (
-                  <Icone nome={pct > 100 ? 'alert-circle' : 'warning-outline'} tamanho={16} cor={corUso(pct)} />
+                  <Icone nome={pct > 100 ? 'alert-circle' : 'warning-outline'} tamanho={16} cor={corUso(pct, cores)} />
                 ) : null}
                 <Text style={[st.valor, num]}>
                   {dinheiro(gasto)}
@@ -87,7 +89,7 @@ export default function Categorias() {
               </View>
               {orc > 0 ? (
                 <>
-                  <Barra pct={pct} cor={corUso(pct)} />
+                  <Barra pct={pct} cor={corUso(pct, cores)} />
                   {pct > 100 ? (
                     <Text style={[st.sub, { color: cores.perigo, ...f[600] }]}>Estourou {dinheiro(gasto - orc)}</Text>
                   ) : pct >= 80 ? (
@@ -147,7 +149,7 @@ function DefinirOrcamento({ categoria, aoFechar }: { categoria: Categoria | null
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   entre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
   rotulo: { fontSize: 13, ...f[600], color: cores.texto2, textTransform: 'none' },
   grande: { fontSize: 26, ...f[800], color: cores.texto1, letterSpacing: -0.6 },
@@ -158,4 +160,4 @@ const st = StyleSheet.create({
   icone: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   nome: { flex: 1, fontSize: 14, ...f[600], color: cores.texto1 },
   valor: { fontSize: 13, ...f[700], color: cores.texto1 },
-})
+}))

@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { useColorScheme } from 'react-native'
 import { formatCurrency } from '@/lib/format'
+import { paletas, TemaContexto } from '~/theme'
 
 // Preferências do aparelho (não vão para o banco): guardadas no localStorage do
 // expo-sqlite, instalado em ~/lib/supabase.
@@ -12,8 +14,13 @@ export interface ConfigLembretes {
   antecedencia: number
 }
 
+export type EscolhaTema = 'claro' | 'escuro' | 'sistema'
+
 interface Prefs {
   ocultarValores: boolean
+  tema: EscolhaTema
+  /** pede a digital/rosto ao abrir o app */
+  biometria: boolean
   lembretes: ConfigLembretes
   /** já passou pela tela "Ativar lembretes" */
   lembretesApresentados: boolean
@@ -21,6 +28,8 @@ interface Prefs {
 
 const PADRAO: Prefs = {
   ocultarValores: false,
+  tema: 'sistema',
+  biometria: false,
   lembretes: { ativo: true, hora: 9, antecedencia: 1 },
   lembretesApresentados: false,
 }
@@ -62,7 +71,16 @@ export function PreferenciasProvider({ children }: { children: ReactNode }) {
 
   const dinheiro = (valor: number) => (prefs.ocultarValores ? 'R$ ••••' : formatCurrency(valor))
 
-  return <Ctx.Provider value={{ ...prefs, mudar, dinheiro }}>{children}</Ctx.Provider>
+  // "Sistema" segue o modo claro/escuro do Android e troca junto com ele.
+  const sistema = useColorScheme()
+  const escuro = prefs.tema === 'escuro' || (prefs.tema === 'sistema' && sistema === 'dark')
+  const tema = useMemo(() => ({ cores: escuro ? paletas.escuro : paletas.claro, escuro }), [escuro])
+
+  return (
+    <Ctx.Provider value={{ ...prefs, mudar, dinheiro }}>
+      <TemaContexto.Provider value={tema}>{children}</TemaContexto.Provider>
+    </Ctx.Provider>
+  )
 }
 
 export function usePreferencias() {

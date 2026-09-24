@@ -1,13 +1,15 @@
 import { router } from 'expo-router'
-import { StyleSheet, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Botao, Icone } from '~/components/ui'
 import { usePreferencias } from '~/context/Preferencias'
 import { pedirPermissaoLembretes } from '~/lib/lembretes'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 /** Explica os lembretes antes do pedido de permissão do Android (só aparece uma vez). */
 export default function AtivarLembretes() {
+  const { cores } = useTema()
+  const st = useSt()
   const p = usePreferencias()
 
   async function ativar() {
@@ -63,7 +65,7 @@ export default function AtivarLembretes() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   tela: { flex: 1, backgroundColor: cores.fundo, paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16 },
   entre: { flexDirection: 'row', justifyContent: 'space-between' },
   sino: {
@@ -98,4 +100,4 @@ const st = StyleSheet.create({
   exemploTitulo: { fontSize: 14, ...f[700], color: cores.texto1, marginTop: 2 },
   exemploTexto: { fontSize: 13, ...f[400], color: cores.texto2 },
   item: { fontSize: 14, ...f[500], color: cores.texto2 },
-})
+}))

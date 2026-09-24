@@ -1,11 +1,13 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import { Botao, Campo, Entrada, Icone, Tela } from '~/components/ui'
 import { useAuth } from '~/context/AuthProvider'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 export default function RecuperarSenha() {
+  const { cores } = useTema()
+  const st = useSt()
   const { recuperarSenha } = useAuth()
   const [email, setEmail] = useState('')
   const [erro, setErro] = useState<string | null>(null)
@@ -42,7 +44,7 @@ export default function RecuperarSenha() {
   return (
     <Tela voltar fundo={cores.superficie}>
       <View style={[st.icone, { backgroundColor: cores.ativoFundo }]}>
-        <Icone nome="lock-closed-outline" tamanho={30} cor={cores.marca} />
+        <Icone nome="lock-closed-outline" tamanho={30} cor={cores.marcaTexto} />
       </View>
       <Text style={st.titulo}>Esqueceu a senha?</Text>
       <Text style={st.texto}>Informe o e-mail da sua conta e enviamos um link para criar uma senha nova.</Text>
@@ -58,14 +60,14 @@ export default function RecuperarSenha() {
         />
       </Campo>
       <Botao onPress={enviar} carregando={enviando}>Enviar link</Botao>
-      <Text style={st.dica}>Entrou com o Google? Então não há senha: volte e toque em "Continuar com Google".</Text>
+      <Text style={st.dica}>Entrou com o Google? Então não há senha: volte e toque em “Continuar com Google”.</Text>
     </Tela>
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   icone: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
   titulo: { fontSize: 26, ...f[800], color: cores.texto1, letterSpacing: -0.5 },
   texto: { fontSize: 15, ...f[400], color: cores.texto2, lineHeight: 22, marginTop: -6 },
   dica: { fontSize: 13, ...f[400], color: cores.texto3, lineHeight: 19 },
-})
+}))

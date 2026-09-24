@@ -1,11 +1,12 @@
 import Constants from 'expo-constants'
 import type { ReactNode } from 'react'
-import { Alert, StyleSheet, Text, View } from 'react-native'
-import { Botao, Cartao, Chave, Chips, Grupo, Tela } from '~/components/ui'
+import { Alert, Text, View } from 'react-native'
+import { autenticar, biometriaDisponivel } from '~/components/Bloqueio'
+import { Botao, Cartao, Chave, Chips, Grupo, Segmentado, Tela } from '~/components/ui'
 import { useAuth } from '~/context/AuthProvider'
-import { usePreferencias } from '~/context/Preferencias'
+import { usePreferencias, type EscolhaTema } from '~/context/Preferencias'
 import { lembretesDisponiveis, pedirPermissaoLembretes } from '~/lib/lembretes'
-import { cores, f } from '~/theme'
+import { criarEstilos, f } from '~/theme'
 
 const HORAS = [7, 9, 12, 18, 20]
 const ANTECEDENCIA = [
@@ -15,6 +16,7 @@ const ANTECEDENCIA = [
 ]
 
 export default function Configuracoes() {
+  const st = useSt()
   const { sessao, sair, viaGoogle } = useAuth()
   const p = usePreferencias()
   const l = p.lembretes
@@ -27,6 +29,16 @@ export default function Configuracoes() {
     p.mudar({ lembretes: { ...l, ativo } })
   }
 
+  async function ligarBiometria(ativo: boolean) {
+    if (!ativo) return p.mudar({ biometria: false })
+    if (!(await biometriaDisponivel())) {
+      Alert.alert('Sem digital cadastrada', 'Cadastre uma digital ou o reconhecimento de rosto nas configurações do Android.')
+      return
+    }
+    // confirma uma vez para garantir que funciona antes de travar o app
+    if (await autenticar('Confirme para ativar o desbloqueio')) p.mudar({ biometria: true })
+  }
+
   function confirmarSaida() {
     Alert.alert('Sair da conta?', 'Você pode entrar de novo quando quiser.', [
       { text: 'Cancelar', style: 'cancel' },
@@ -36,8 +48,26 @@ export default function Configuracoes() {
 
   return (
     <Tela titulo="Configurações" voltar>
+      <Grupo>Aparência</Grupo>
+      <Cartao style={{ gap: 10 }}>
+        <Text style={st.titulo}>Tema</Text>
+        <Segmentado<EscolhaTema>
+          valor={p.tema}
+          aoMudar={(tema) => p.mudar({ tema })}
+          opcoes={[
+            { valor: 'claro', rotulo: 'Claro' },
+            { valor: 'escuro', rotulo: 'Escuro' },
+            { valor: 'sistema', rotulo: 'Sistema' },
+          ]}
+        />
+      </Cartao>
+
       <Grupo>Privacidade</Grupo>
       <Cartao style={{ paddingVertical: 4 }}>
+        <Linha titulo="Desbloquear com digital" detalhe="Pede a digital ao abrir o app e ao voltar depois de 1 minuto">
+          <Chave valor={p.biometria} aoMudar={ligarBiometria} rotulo="Desbloquear com digital" />
+        </Linha>
+        <View style={st.divisor} />
         <Linha titulo="Esconder valores" detalhe="Mostra R$ •••• no lugar dos números (o olho no Início faz o mesmo)">
           <Chave valor={p.ocultarValores} aoMudar={(v) => p.mudar({ ocultarValores: v })} rotulo="Esconder valores" />
         </Linha>
@@ -87,6 +117,7 @@ export default function Configuracoes() {
 }
 
 function Linha({ titulo, detalhe, children }: { titulo: string; detalhe?: string; children: ReactNode }) {
+  const st = useSt()
   return (
     <View style={st.linha}>
       <View style={{ flex: 1 }}>
@@ -98,7 +129,7 @@ function Linha({ titulo, detalhe, children }: { titulo: string; detalhe?: string
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 56 },
   bloco: { paddingVertical: 12, gap: 10 },
   divisor: { borderTopWidth: 1, borderTopColor: cores.sutil },
@@ -106,4 +137,4 @@ const st = StyleSheet.create({
   detalhe: { fontSize: 12, ...f[400], color: cores.texto3, lineHeight: 17 },
   valor: { fontSize: 13, ...f[500], color: cores.texto2, maxWidth: 180 },
   versao: { fontSize: 12, ...f[400], color: cores.texto3, textAlign: 'center' },
-})
+}))

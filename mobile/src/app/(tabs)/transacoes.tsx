@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { RefreshControl, StyleSheet, Text, View } from 'react-native'
+import { RefreshControl, Text, View } from 'react-native'
 import { inMonth, sum } from '@/lib/finance'
 import { formatDate } from '@/lib/format'
 import type { Movimentacao } from '@/lib/types'
@@ -9,7 +9,7 @@ import { SeletorMes } from '~/components/SeletorMes'
 import { Cartao, Carregando, Segmentado, Tela, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 type Filtro = 'todas' | 'receitas' | 'despesas'
 
@@ -23,6 +23,8 @@ function rotuloDia(data: string) {
 }
 
 export default function Transacoes() {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
   const { dinheiro } = usePreferencias()
   const [filtro, setFiltro] = useState<Filtro>('todas')
@@ -120,7 +122,7 @@ export default function Transacoes() {
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   resumo: {
     flexDirection: 'row',
     backgroundColor: cores.superficie,
@@ -136,4 +138,4 @@ const st = StyleSheet.create({
   resumoValor: { fontSize: 14, ...f[800], color: cores.texto1, marginTop: 2 },
   dia: { fontSize: 12, ...f[700], color: cores.texto3, marginLeft: 4, textTransform: 'capitalize' },
   dica: { fontSize: 12, ...f[400], color: cores.texto3, textAlign: 'center' },
-})
+}))

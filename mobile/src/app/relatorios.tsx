@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import { inMonth, monthlySeries, spendingByCategory } from '@/lib/finance'
 import { formatPercent } from '@/lib/format'
 import { Barra, Cartao, Segmentado, Tela, TituloSecao, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
-import { cores, f } from '~/theme'
+import { criarEstilos, f, useTema } from '~/theme'
 
 const ALTURA = 150
 
 export default function Relatorios() {
+  const { cores } = useTema()
+  const st = useSt()
   const d = useDados()
   const { dinheiro } = usePreferencias()
   const serie = useMemo(() => monthlySeries(d.receitas, d.despesas, 6), [d.receitas, d.despesas])
@@ -101,7 +103,7 @@ export default function Relatorios() {
                   {dinheiro(g.total)} <Text style={st.dica}>{formatPercent(g.pct, 0)}</Text>
                 </Text>
               </View>
-              <Barra pct={(g.total / maiorGasto) * 100} cor={cores.marca} />
+              <Barra pct={(g.total / maiorGasto) * 100} cor={cores.marcaTexto} />
             </View>
           ))
         )}
@@ -111,6 +113,7 @@ export default function Relatorios() {
 }
 
 function Legenda({ cor, texto }: { cor: string; texto: string }) {
+  const st = useSt()
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: cor }} />
@@ -120,6 +123,7 @@ function Legenda({ cor, texto }: { cor: string; texto: string }) {
 }
 
 function Linha({ cor, rotulo, valor }: { cor: string; rotulo: string; valor: string }) {
+  const st = useSt()
   return (
     <View style={st.entre}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -131,7 +135,7 @@ function Linha({ cor, rotulo, valor }: { cor: string; rotulo: string; valor: str
   )
 }
 
-const st = StyleSheet.create({
+const useSt = criarEstilos((cores) => ({
   entre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   legenda: { flexDirection: 'row', gap: 16, marginTop: -6 },
   legendaTexto: { fontSize: 12, ...f[600], color: cores.texto2 },
@@ -149,4 +153,4 @@ const st = StyleSheet.create({
   sub: { fontSize: 13, ...f[400], color: cores.texto2 },
   categoria: { fontSize: 14, ...f[600], color: cores.texto1, flex: 1 },
   dica: { fontSize: 12, ...f[400], color: cores.texto3 },
-})
+}))
