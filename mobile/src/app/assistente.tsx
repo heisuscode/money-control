@@ -131,7 +131,7 @@ export default function Assistente() {
             endereco={ENDERECO_AUDIO}
             desabilitado={pensando}
             aoErro={(m) => Alert.alert('Microfone', m)}
-            aoTranscrever={(falado) => setTexto((atual) => (atual.trim() ? `${atual.trim()} ${falado}` : falado))}
+            aoTranscrever={(falado) => enviar(texto.trim() ? `${texto.trim()} ${falado}` : falado)}
           />
           <Pressable
             onPress={() => enviar(texto)}

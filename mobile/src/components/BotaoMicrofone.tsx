@@ -17,7 +17,7 @@ import { Icone } from './ui'
 /**
  * Microfone do assistente: toca para gravar, toca de novo para parar (para
  * sozinho em 1 minuto). O .m4a vai para api/transcrever e o texto volta por
- * `aoTranscrever`, para a pessoa conferir antes de enviar.
+ * `aoTranscrever`, que manda a mensagem ao assistente.
  */
 export function BotaoMicrofone({
   endereco,

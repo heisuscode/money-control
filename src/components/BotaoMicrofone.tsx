@@ -221,7 +221,7 @@ function Orientacao({
             Fale seus gastos em vez de digitar. O navegador vai perguntar se pode usar o microfone: toque em <b>Permitir</b>.
           </p>
         </div>
-        <p className="text-[12px] text-text-3">O áudio vira texto e não fica guardado. Você confere antes de enviar.</p>
+        <p className="text-[12px] text-text-3">O áudio vira texto, vai para o assistente e não fica guardado.</p>
         <div className="flex gap-3">
           <Button variant="ghost" className="flex-1" onClick={aoFechar}>Agora não</Button>
           <Button className="flex-1" onClick={aoPermitir}>

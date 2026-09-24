@@ -183,16 +183,15 @@ export default function Assistente() {
               }}
               rows={1}
               maxLength={1000}
-              placeholder='Digite ou toque no microfone: "gastei 80 no mercado"'
+              placeholder='Digite ou toque no microfone e fale: "gastei 80 no mercado"'
               className="input-base max-h-32 min-h-[44px] flex-1 resize-none py-2.5"
             />
             <BotaoMicrofone
               desabilitado={pensando}
               aoErro={(m) => toast('error', m)}
               aoTranscrever={(falado) => {
-                // cai no campo para conferir (valores ditos em voz podem vir errados)
-                setTexto((atual) => (atual.trim() ? `${atual.trim()} ${falado}` : falado))
-                campo.current?.focus()
+                // voz vai direto para o assistente (junto com o que já estava digitado)
+                enviar(texto.trim() ? `${texto.trim()} ${falado}` : falado)
               }}
             />
             <button type="submit" className="btn-primary h-11 !px-4" disabled={!texto.trim() || pensando} aria-label="Enviar">
