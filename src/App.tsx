@@ -22,6 +22,7 @@ import Configuracoes from './pages/Configuracoes'
 import Categorias from './pages/Categorias'
 import CarteirasPage from './financeiro/CarteirasPage'
 import RecorrenciasPage from './financeiro/RecorrenciasPage'
+import Assistente from './pages/Assistente'
 
 function FullScreenLoader() {
   return (
@@ -83,6 +84,7 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/assistente" element={<Assistente />} />
         <Route path="/receitas" element={<Transacoes filtroInicial="receitas" />} />
         <Route path="/despesas" element={<Transacoes filtroInicial="despesas" />} />
         <Route path="/transacoes" element={<Transacoes filtroInicial="todas" />} />

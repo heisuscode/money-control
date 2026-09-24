@@ -44,6 +44,7 @@ function Navegacao() {
           <Stack.Screen name="cambio" />
           <Stack.Screen name="notificacoes" />
           <Stack.Screen name="configuracoes" />
+          <Stack.Screen name="assistente" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="ativar-lembretes" options={{ animation: 'fade' }} />
         </Stack.Protected>
         <Stack.Protected guard={!sessao}>

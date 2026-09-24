@@ -34,6 +34,16 @@ export default function Mais() {
         </View>
       </Cartao>
 
+      <Cartao style={{ paddingVertical: 2 }}>
+        <ItemMenu
+          primeiro
+          icone="chatbubble-ellipses-outline"
+          titulo="Assistente"
+          detalhe="Conte seus gastos e pergunte sobre suas finanças"
+          aoTocar={() => router.push('/assistente')}
+        />
+      </Cartao>
+
       <Grupo>Planejamento</Grupo>
       <Cartao style={{ paddingVertical: 2 }}>
         <ItemMenu primeiro icone="repeat" titulo="Recorrências" detalhe={ativas ? `${ativas} ativas` : 'Contas fixas e assinaturas'} aoTocar={() => router.push('/recorrencias')} />

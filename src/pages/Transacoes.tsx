@@ -3,7 +3,7 @@ import { Plus, Search, SlidersHorizontal, ArrowUp, ArrowDown, Pencil, Trash2, Re
 import { IconeItem } from '@/components/IconeItem'
 import { Topbar } from '@/components/Topbar'
 import { PageBody } from '@/components/PageBody'
-import { Card, Chip, EmptyState, ErrorState, Select, Skeleton } from '@/components/ui'
+import { Card, Chip, EmptyState, ErrorState, Skeleton } from '@/components/ui'
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useNovaTransacao } from '@/components/AppLayout'
@@ -27,11 +27,14 @@ export default function Transacoes({ filtroInicial }: { filtroInicial: Filtro })
 
   const [filtro, setFiltro] = useState<Filtro>(filtroInicial)
 
-  useEffect(() => {
-    setFiltro(filtroInicial)
-  }, [filtroInicial])
   const [busca, setBusca] = useState('')
   const [categoria, setCategoria] = useState('')
+
+  // trocou entre /receitas e /despesas pelo menu: recomeça os filtros
+  useEffect(() => {
+    setFiltro(filtroInicial)
+    setCategoria('')
+  }, [filtroInicial])
   const [mostraFiltros, setMostraFiltros] = useState(false)
   const [excluir, setExcluir] = useState<Movimentacao | null>(null)
   const [excluindo, setExcluindo] = useState(false)
@@ -48,9 +51,20 @@ export default function Transacoes({ filtroInicial }: { filtroInicial: Filtro })
     return [...base].sort((a, b) => (a.data < b.data ? 1 : -1))
   }, [filtro, receitas, despesas, todas, busca, categoria])
 
+  // Entradas, saídas e saldo do mês seguem os filtros de categoria e busca.
   const now = new Date()
-  const entradasMes = sum(receitas.filter((r) => inMonth(r.data, now.getFullYear(), now.getMonth())))
-  const saidasMes = sum(despesas.filter((r) => inMonth(r.data, now.getFullYear(), now.getMonth())))
+  const doFiltro = (m: Movimentacao) =>
+    inMonth(m.data, now.getFullYear(), now.getMonth()) &&
+    (!categoria || m.categoria_id === categoria) &&
+    (!busca || m.descricao.toLowerCase().includes(busca.toLowerCase()))
+  const entradasMes = sum(receitas.filter(doFiltro))
+  const saidasMes = sum(despesas.filter(doFiltro))
+  const categoriaAtiva = categorias.find((c) => c.id === categoria)
+  const filtrando = !!categoriaAtiva || !!busca
+  // Em Receitas só aparecem categorias de receita (e o mesmo em Despesas).
+  const categoriasDoFiltro = categorias.filter((c) =>
+    filtro === 'receitas' ? c.tipo === 'receita' : filtro === 'despesas' ? c.tipo === 'despesa' : true,
+  )
 
   async function confirmarExcluir() {
     if (!excluir) return
@@ -87,7 +101,11 @@ export default function Transacoes({ filtroInicial }: { filtroInicial: Filtro })
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SegmentedTabs
             value={filtro}
-            onChange={(v) => setFiltro(v as Filtro)}
+            onChange={(v) => {
+              setFiltro(v as Filtro)
+              // categoria de despesa não faz sentido na aba Receitas (e vice-versa)
+              setCategoria('')
+            }}
             tabs={[
               { value: 'todas', label: 'Todas' },
               { value: 'receitas', label: 'Receitas' },
@@ -116,24 +134,67 @@ export default function Transacoes({ filtroInicial }: { filtroInicial: Filtro })
         {mostraFiltros && (
           <Card className="!p-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-[13px] font-semibold text-text-2">
-                  Categoria
-                </label>
-                <Select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-                  <option value="">Todas as categorias</option>
-                  {categorias.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome}
-                    </option>
-                  ))}
-                </Select>
+              <div className="sm:col-span-2">
+                <div className="mb-2 text-[13px] font-semibold text-text-2">Categoria</div>
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Filtrar por categoria">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!categoria}
+                    onClick={() => setCategoria('')}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 text-[13px] font-semibold transition',
+                      !categoria ? 'border-brand bg-active-bg text-brand' : 'border-line text-text-2 hover:bg-subtle',
+                    )}
+                  >
+                    Todas
+                  </button>
+                  {categoriasDoFiltro.map((c) => {
+                    const ativa = categoria === c.id
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={ativa}
+                        onClick={() => setCategoria(ativa ? '' : c.id)}
+                        className={cn(
+                          'inline-flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-[13px] font-semibold transition',
+                          ativa ? 'border-brand bg-active-bg text-brand' : 'border-line text-text-2 hover:bg-subtle',
+                        )}
+                      >
+                        <IconeItem icone={c.icone} nome={c.nome} cor={c.cor} className="h-6 w-6 !rounded-full" tamanho={13} />
+                        {c.nome}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           </Card>
         )}
 
-        {/* Mini-cards */}
+        {/* Mini-cards: refletem os filtros ativos */}
+        {filtrando && (
+          <div className="-mb-1 flex flex-wrap items-center gap-2 text-[12px] text-text-2">
+            <span>
+              Totais de {inMonthName()} filtrados por
+              {categoriaAtiva ? <b className="text-text-1"> {categoriaAtiva.nome}</b> : null}
+              {categoriaAtiva && busca ? ' e' : null}
+              {busca ? <b className="text-text-1"> “{busca}”</b> : null}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setCategoria('')
+                setBusca('')
+              }}
+              className="font-semibold text-brand hover:underline"
+            >
+              Limpar filtros
+            </button>
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-3">
           <MiniCard color="success" icon={<ArrowUp size={16} />} label={`Entradas · ${inMonthName()}`} value={entradasMes} />
           <MiniCard color="danger" icon={<ArrowDown size={16} />} label={`Saídas · ${inMonthName()}`} value={saidasMes} />

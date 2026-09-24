@@ -133,6 +133,21 @@ export default function Inicio() {
               <Atalho icone="card-outline" rotulo="Faturas" cor={cores.marcaTexto} fundo={cores.ativoFundo} aoTocar={irFaturas} />
             </View>
 
+            <Pressable
+              onPress={() => router.push('/assistente')}
+              accessibilityRole="button"
+              style={({ pressed }) => [st.assistente, pressed && { opacity: 0.8 }]}
+            >
+              <View style={st.assistenteIcone}>
+                <Icone nome="chatbubble-ellipses-outline" tamanho={20} cor={cores.marcaTexto} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={st.assistenteTitulo}>Pergunte ao assistente</Text>
+                <Text style={st.assistenteSub} numberOfLines={1}>“Gastei 45 no almoço” · “Como estão meus gastos?”</Text>
+              </View>
+              <Icone nome="chevron-forward" tamanho={18} cor={cores.texto3} />
+            </Pressable>
+
             <Cartao>
               <TituloSecao acao="Ver todas" aoTocarAcao={() => router.navigate('/contas')}>Próximas contas</TituloSecao>
               {proximas.length === 0 ? (
@@ -217,6 +232,10 @@ const useSt = criarEstilos((cores) => ({
   miniRotulo: { fontSize: 11, ...f[600] },
   miniValor: { color: '#FFFFFF', fontSize: 14, ...f[700], marginTop: 2 },
   atalhos: { flexDirection: 'row', justifyContent: 'space-between' },
+  assistente: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: cores.superficie, borderWidth: 1, borderColor: cores.linha, borderRadius: 20, padding: 14 },
+  assistenteIcone: { width: 40, height: 40, borderRadius: 12, backgroundColor: cores.ativoFundo, alignItems: 'center', justifyContent: 'center' },
+  assistenteTitulo: { fontSize: 14, ...f[700], color: cores.texto1 },
+  assistenteSub: { fontSize: 12, ...f[400], color: cores.texto3 },
   atalho: { alignItems: 'center', gap: 6, width: 72 },
   atalhoIcone: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   atalhoTexto: { fontSize: 12, ...f[600], color: cores.texto1 },

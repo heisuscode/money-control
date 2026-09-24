@@ -16,6 +16,7 @@ import {
   Wallet,
   Repeat,
   type LucideIcon,
+  Bot,
 } from 'lucide-react'
 import { Logo } from './Logo'
 import { useSidebar } from '@/contexts/SidebarContext'
@@ -32,6 +33,7 @@ interface Item {
 
 const PRINCIPAL: Item[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/assistente', label: 'Assistente', icon: Bot, badge: 'novo' },
   { to: '/receitas', label: 'Receitas', icon: ArrowUp },
   { to: '/despesas', label: 'Despesas', icon: ArrowDown },
   { to: '/carteiras', label: 'Carteiras & Cartões', icon: Wallet, badge: 'novo' },
