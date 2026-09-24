@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bot, SendHorizontal, Trash2, Undo2 } from 'lucide-react'
+import { BotaoMicrofone } from '@/components/BotaoMicrofone'
 import { Topbar } from '@/components/Topbar'
 import { PageBody } from '@/components/PageBody'
 import { Card } from '@/components/ui'
@@ -182,8 +183,17 @@ export default function Assistente() {
               }}
               rows={1}
               maxLength={1000}
-              placeholder='Ex.: "gastei 80 no mercado" ou "quanto gastei com transporte?"'
+              placeholder='Digite ou toque no microfone: "gastei 80 no mercado"'
               className="input-base max-h-32 min-h-[44px] flex-1 resize-none py-2.5"
+            />
+            <BotaoMicrofone
+              desabilitado={pensando}
+              aoErro={(m) => toast('error', m)}
+              aoTranscrever={(falado) => {
+                // cai no campo para conferir (valores ditos em voz podem vir errados)
+                setTexto((atual) => (atual.trim() ? `${atual.trim()} ${falado}` : falado))
+                campo.current?.focus()
+              }}
             />
             <button type="submit" className="btn-primary h-11 !px-4" disabled={!texto.trim() || pensando} aria-label="Enviar">
               <SendHorizontal size={18} />

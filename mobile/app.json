@@ -29,7 +29,11 @@
       "@react-native-community/datetimepicker",
       "expo-font",
       "expo-web-browser",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-audio",
+        { "microphonePermission": "O MoneyControl usa o microfone para você falar seus gastos com o assistente." }
+      ]
     ],
     "scheme": "moneycontrol",
     "experiments": {

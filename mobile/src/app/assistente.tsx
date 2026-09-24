@@ -10,6 +10,7 @@ import {
   type MensagemAssistente,
   type RegistroAssistente,
 } from '@/lib/assistente'
+import { BotaoMicrofone } from '~/components/BotaoMicrofone'
 import { BotaoIcone, Icone } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
 import { supabase } from '~/lib/supabase'
@@ -18,6 +19,7 @@ import { criarEstilos, f, useTema } from '~/theme'
 // O assistente roda no servidor do site (api/assistente.ts). Para testar uma
 // branch antes de publicar, aponte EXPO_PUBLIC_ASSISTENTE_URL para o preview.
 const ENDERECO = process.env.EXPO_PUBLIC_ASSISTENTE_URL || 'https://moneycontrolapp.vercel.app/api/assistente'
+const ENDERECO_AUDIO = ENDERECO.replace(/assistente$/, 'transcrever')
 
 export default function Assistente() {
   const { cores } = useTema()
@@ -118,12 +120,18 @@ export default function Assistente() {
           <TextInput
             value={texto}
             onChangeText={setTexto}
-            placeholder='Ex.: "gastei 80 no mercado"'
+            placeholder="Digite ou toque no microfone"
             placeholderTextColor={cores.texto3}
             multiline
             maxLength={1000}
             accessibilityLabel="Mensagem para o assistente"
             style={st.entrada}
+          />
+          <BotaoMicrofone
+            endereco={ENDERECO_AUDIO}
+            desabilitado={pensando}
+            aoErro={(m) => Alert.alert('Microfone', m)}
+            aoTranscrever={(falado) => setTexto((atual) => (atual.trim() ? `${atual.trim()} ${falado}` : falado))}
           />
           <Pressable
             onPress={() => enviar(texto)}

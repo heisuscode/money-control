@@ -53,3 +53,19 @@ export async function perguntarAoAssistente(
     return { resposta: 'Sem conexão com o assistente. Verifique a internet e tente de novo.', registros: [], erro: true }
   }
 }
+
+/** Duração máxima de uma gravação do microfone. */
+export const SEGUNDOS_MAX_AUDIO = 60
+
+/**
+ * Lê a resposta de api/transcrever. Cada plataforma envia o áudio do seu jeito
+ * (Blob no site, arquivo do expo-file-system no app) e passa a Response aqui.
+ */
+export async function lerTranscricao(resposta: {
+  ok: boolean
+  json(): Promise<unknown>
+}): Promise<{ texto?: string; erro?: string }> {
+  const corpo = (await resposta.json().catch(() => ({}))) as { texto?: string; erro?: string }
+  if (!resposta.ok || !corpo.texto) return { erro: corpo.erro ?? 'Não consegui entender o áudio. Tente de novo ou digite.' }
+  return { texto: corpo.texto }
+}
