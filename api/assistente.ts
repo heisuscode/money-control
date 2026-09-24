@@ -329,7 +329,9 @@ export async function POST(request: Request) {
   const urlSupabase = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
   const chaveSupabase = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY
   if (!chave || !urlSupabase || !chaveSupabase) {
-    return json({ erro: 'O assistente ainda não foi configurado no servidor.' }, 503)
+    // só os NOMES do que falta, para diagnosticar a configuração na Vercel
+    const faltando = [!chave && 'IA_CHAVE', !urlSupabase && 'VITE_SUPABASE_URL', !chaveSupabase && 'VITE_SUPABASE_ANON_KEY'].filter(Boolean)
+    return json({ erro: 'O assistente ainda não foi configurado no servidor.', faltando }, 503)
   }
 
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
