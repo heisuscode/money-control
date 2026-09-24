@@ -11,7 +11,7 @@ const pedido = (corpo: unknown, token?: string) =>
 describe('api/assistente — guardas antes de chamar a IA', () => {
   const salvo = { ...process.env }
   beforeEach(() => {
-    process.env.ANTHROPIC_API_KEY = 'teste'
+    process.env.IA_CHAVE = 'teste'
     process.env.VITE_SUPABASE_URL = 'https://exemplo.supabase.co'
     process.env.VITE_SUPABASE_ANON_KEY = 'anon'
   })
@@ -26,7 +26,8 @@ describe('api/assistente — guardas antes de chamar a IA', () => {
   })
 
   it('sem chave configurada: 503', async () => {
-    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.IA_CHAVE
+    delete process.env.GROQ_API_KEY
     const r = await POST(pedido({ mensagens: [{ papel: 'usuario', texto: 'oi' }] }, 't'))
     expect(r.status).toBe(503)
   })

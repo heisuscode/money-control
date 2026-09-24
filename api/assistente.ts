@@ -1,18 +1,22 @@
 // Assistente financeiro (site e app). Conversa sobre as finanças do usuário e
 // registra receitas/despesas ditas no chat.
 //
+// IA: qualquer API no formato "compatível com OpenAI" (chat/completions com
+// tools). Padrão: Groq, plano gratuito, modelo pequeno openai/gpt-oss-20b.
+// Trocar de provedor (Gemini, OpenRouter...) é só mudar IA_URL/IA_MODELO.
+//
 // Segurança:
-// - A chave da Anthropic fica só aqui (variável ANTHROPIC_API_KEY na Vercel).
+// - A chave da IA fica só aqui (variável IA_CHAVE na Vercel).
 // - Toda leitura/gravação no Supabase usa o token do próprio usuário: o RLS
 //   garante que ele só vê e grava os próprios dados.
 //
 // Arquivo autocontido: funções da Vercel não resolvem o alias `@/`, então não
 // importa nada de `src/`.
 
-import Anthropic from '@anthropic-ai/sdk'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const MODELO = 'claude-sonnet-5'
+const URL_PADRAO = 'https://api.groq.com/openai/v1/chat/completions'
+const MODELO_PADRAO = 'openai/gpt-oss-20b'
 const MAX_MENSAGENS = 20
 const MAX_VOLTAS = 5
 
@@ -146,12 +150,18 @@ async function montarContexto(sb: SupabaseClient, uid: string): Promise<Contexto
 
 /* ------------------------------ ferramentas ------------------------------ */
 
-const FERRAMENTAS: Anthropic.Tool[] = [
+interface Ferramenta {
+  name: string
+  description: string
+  parameters: Record<string, unknown>
+}
+
+const FERRAMENTAS: Ferramenta[] = [
   {
     name: 'registrar_transacao',
     description:
       'Grava uma receita ou despesa do usuário. Use só quando souber o valor, o que foi (descrição) e se é receita ou despesa. Nunca invente o que foi: se faltar, pergunte antes.',
-    input_schema: {
+    parameters: {
       type: 'object',
       properties: {
         tipo: { type: 'string', enum: ['receita', 'despesa'] },
@@ -174,7 +184,7 @@ const FERRAMENTAS: Anthropic.Tool[] = [
     name: 'buscar_transacoes',
     description:
       'Lista receitas/despesas do usuário para responder perguntas detalhadas (ex.: "quanto gastei com mercado em agosto?"). Devolve no máximo 40 lançamentos e o total.',
-    input_schema: {
+    parameters: {
       type: 'object',
       properties: {
         tipo: { type: 'string', enum: ['receita', 'despesa'] },
@@ -270,6 +280,42 @@ Dados atuais do usuário:
 ${ctx.resumo}`
 }
 
+/* ------------------------------ chamada à IA ------------------------------ */
+
+interface ChamadaFerramenta {
+  id: string
+  type: 'function'
+  function: { name: string; arguments: string }
+}
+
+type MensagemIA =
+  | { role: 'system' | 'user'; content: string }
+  | { role: 'assistant'; content: string | null; tool_calls?: ChamadaFerramenta[] }
+  | { role: 'tool'; tool_call_id: string; content: string }
+
+class LimiteDaIA extends Error {}
+
+async function chamarIA(url: string, chave: string, modelo: string, mensagens: MensagemIA[]) {
+  const resposta = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${chave}` },
+    body: JSON.stringify({
+      model: modelo,
+      messages: mensagens,
+      tools: FERRAMENTAS.map((f) => ({ type: 'function', function: f })),
+      tool_choice: 'auto',
+      temperature: 0.3,
+      max_tokens: 1024,
+    }),
+  })
+  if (resposta.status === 429) throw new LimiteDaIA()
+  if (!resposta.ok) throw new Error(`IA respondeu ${resposta.status}: ${(await resposta.text()).slice(0, 300)}`)
+  const corpo = (await resposta.json()) as {
+    choices?: { message?: { content?: string | null; tool_calls?: ChamadaFerramenta[] } }[]
+  }
+  return corpo.choices?.[0]?.message ?? {}
+}
+
 /* ------------------------------- handler ------------------------------- */
 
 export async function OPTIONS() {
@@ -277,7 +323,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: Request) {
-  const chave = process.env.ANTHROPIC_API_KEY
+  const chave = process.env.IA_CHAVE ?? process.env.GROQ_API_KEY
+  const urlIA = process.env.IA_URL || URL_PADRAO
+  const modelo = process.env.IA_MODELO || MODELO_PADRAO
   const urlSupabase = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
   const chaveSupabase = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY
   if (!chave || !urlSupabase || !chaveSupabase) {
@@ -312,49 +360,45 @@ export async function POST(request: Request) {
 
   try {
     const ctx = await montarContexto(sb, usuario.user.id)
-    const cliente = new Anthropic({ apiKey: chave })
-    const mensagens: Anthropic.MessageParam[] = historico.map((m) => ({
-      role: m.papel === 'usuario' ? 'user' : 'assistant',
-      content: m.texto.slice(0, 2000),
-    }))
+    const mensagens: MensagemIA[] = [
+      { role: 'system', content: instrucoes(ctx) },
+      ...historico.map((m): MensagemIA =>
+        m.papel === 'usuario' ? { role: 'user', content: m.texto.slice(0, 2000) } : { role: 'assistant', content: m.texto.slice(0, 2000) },
+      ),
+    ]
     const registros: Registro[] = []
 
     for (let volta = 0; volta < MAX_VOLTAS; volta++) {
-      const resposta = await cliente.messages.create({
-        model: MODELO,
-        max_tokens: 1024,
-        system: instrucoes(ctx),
-        tools: FERRAMENTAS,
-        messages: mensagens,
-      })
-
-      const chamadas = resposta.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
-      if (resposta.stop_reason !== 'tool_use' || !chamadas.length) {
-        const texto = resposta.content
-          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-          .map((b) => b.text)
-          .join('\n')
-          .trim()
-        return json({ resposta: texto || 'Pronto.', registros })
+      const resposta = await chamarIA(urlIA, chave, modelo, mensagens)
+      const chamadas = resposta.tool_calls ?? []
+      if (!chamadas.length) {
+        return json({ resposta: (resposta.content ?? '').trim() || 'Pronto.', registros })
       }
 
-      mensagens.push({ role: 'assistant', content: resposta.content })
-      const resultados: Anthropic.ToolResultBlockParam[] = []
+      mensagens.push({ role: 'assistant', content: resposta.content ?? null, tool_calls: chamadas })
       for (const chamada of chamadas) {
-        const entrada = (chamada.input ?? {}) as Entrada
+        let entrada: Entrada = {}
+        try {
+          entrada = JSON.parse(chamada.function.arguments || '{}') as Entrada
+        } catch {
+          /* argumentos quebrados: a ferramenta devolve erro e a IA tenta de novo */
+        }
+        const nome = chamada.function.name
         const saida =
-          chamada.name === 'registrar_transacao'
+          nome === 'registrar_transacao'
             ? await registrarTransacao(sb, ctx, entrada, registros)
-            : chamada.name === 'buscar_transacoes'
+            : nome === 'buscar_transacoes'
               ? await buscarTransacoes(sb, ctx, entrada)
               : { erro: 'ferramenta desconhecida' }
-        resultados.push({ type: 'tool_result', tool_use_id: chamada.id, content: JSON.stringify(saida) })
+        mensagens.push({ role: 'tool', tool_call_id: chamada.id, content: JSON.stringify(saida) })
       }
-      mensagens.push({ role: 'user', content: resultados })
     }
 
     return json({ resposta: 'Fiz o que deu. Pode repetir o pedido de outro jeito?', registros })
   } catch (e) {
+    if (e instanceof LimiteDaIA) {
+      return json({ erro: 'O limite gratuito da IA foi atingido por agora. Espere um minuto e tente de novo.' }, 429)
+    }
     console.error('[assistente]', e)
     return json({ erro: 'O assistente não conseguiu responder agora. Tente de novo em instantes.' }, 502)
   }
