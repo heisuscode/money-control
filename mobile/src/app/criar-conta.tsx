@@ -78,7 +78,7 @@ export default function CriarConta() {
       <Text style={st.titulo}>Criar conta</Text>
       <Text style={st.texto}>A mesma conta funciona no site e no app.</Text>
       <BotaoGoogle aoTocar={comGoogle} carregando={google} texto="Criar com Google" />
-      <Ou />
+      <Ou texto="ou com e-mail" />
       <Campo rotulo="Nome">
         <Entrada value={nome} onChangeText={setNome} autoComplete="name" placeholder="Como quer ser chamado" />
       </Campo>

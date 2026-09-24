@@ -1,23 +1,44 @@
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { BotaoGoogle, Marca, Ou } from '~/components/Acesso'
-import { Botao, Campo, Entrada } from '~/components/ui'
+import { useEffect, useRef, useState } from 'react'
+import { BackHandler, KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { BotaoGoogle, IlustracaoAcesso, Marca, Ou } from '~/components/Acesso'
+import { Botao, BotaoIcone, Campo, Entrada, Icone } from '~/components/ui'
 import { useAuth } from '~/context/AuthProvider'
 import { criarEstilos, f, useTema } from '~/theme'
+
+type Modo = 'opcoes' | 'email'
 
 export default function Login() {
   const { cores } = useTema()
   const st = useSt()
+  const insets = useSafeAreaInsets()
   const { entrar, entrarComGoogle } = useAuth()
+  const [modo, setModo] = useState<Modo>('opcoes')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [verSenha, setVerSenha] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [google, setGoogle] = useState(false)
+  const campoSenha = useRef<TextInput>(null)
+
+  function trocarModo(novo: Modo) {
+    setErro(null)
+    setModo(novo)
+  }
+
+  // No formulário de e-mail, o "voltar" do Android volta para as opções.
+  useEffect(() => {
+    if (modo !== 'email') return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setErro(null)
+      setModo('opcoes')
+      return true
+    })
+    return () => sub.remove()
+  }, [modo])
 
   async function comGoogle() {
     setErro(null)
@@ -36,77 +57,136 @@ export default function Login() {
     if (falha) setErro(falha)
   }
 
+  const comEmail = modo === 'email'
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: cores.tinta }}>
+    <SafeAreaView style={st.tela} edges={['top']}>
       <StatusBar style="light" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={st.tela} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" bounces={false}>
           <View style={st.topo}>
-            <Marca />
+            <Marca tamanho={36} />
             <Text style={st.nomeApp}>MoneyControl</Text>
-            <Text style={st.slogan}>Suas finanças organizadas, no site e no celular.</Text>
           </View>
-          <View style={st.caixa}>
-            <Text style={st.titulo}>Entrar</Text>
-            <BotaoGoogle aoTocar={comGoogle} carregando={google} />
-            <Ou />
-            <Campo rotulo="E-mail">
-              <Entrada
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                placeholder="voce@email.com"
-              />
-            </Campo>
-            <Campo rotulo="Senha">
-              <View>
-                <Entrada
-                  value={senha}
-                  onChangeText={setSenha}
-                  secureTextEntry={!verSenha}
-                  autoComplete="password"
-                  placeholder="••••••••"
-                  onSubmitEditing={enviar}
-                  style={{ paddingRight: 52 }}
-                />
-                <Pressable
-                  onPress={() => setVerSenha((v) => !v)}
-                  accessibilityLabel={verSenha ? 'Esconder senha' : 'Mostrar senha'}
-                  style={st.olho}
-                >
-                  <Text style={st.link}>{verSenha ? 'Ocultar' : 'Ver'}</Text>
-                </Pressable>
-              </View>
-            </Campo>
-            <Pressable onPress={() => router.push('/recuperar-senha')} hitSlop={8} style={{ alignSelf: 'flex-end' }}>
-              <Text style={st.link}>Esqueci a senha</Text>
-            </Pressable>
-            {erro ? <Text style={st.erro}>{erro}</Text> : null}
-            <Botao onPress={enviar} carregando={enviando}>Entrar</Botao>
-          </View>
-          <Pressable onPress={() => router.push('/criar-conta')} hitSlop={8} style={st.criar}>
-            <Text style={st.criarTexto}>
-              Ainda não tem conta? <Text style={{ color: '#FFFFFF', ...f[700] }}>Criar conta</Text>
+
+          <View style={[st.hero, comEmail && st.heroCompacto]}>
+            {comEmail ? null : <IlustracaoAcesso />}
+            <Text style={[st.titulo, comEmail && st.tituloCompacto]} accessibilityRole="header">
+              {comEmail ? 'Bem-vindo de volta' : 'Suas finanças, sem planilha.'}
             </Text>
-          </Pressable>
+            <Text style={st.subtitulo}>
+              {comEmail ? 'Use o e-mail e a senha da sua conta.' : 'Contas, cartões e parcelas num só lugar. É a mesma conta do site.'}
+            </Text>
+          </View>
+
+          <View style={[st.folha, { paddingBottom: 20 + insets.bottom }]}>
+            {comEmail ? (
+              <>
+                <View style={st.folhaTopo}>
+                  <BotaoIcone icone="chevron-back" rotulo="Voltar às opções de entrada" aoTocar={() => trocarModo('opcoes')} />
+                  <Text style={st.folhaTitulo}>Entrar com e-mail</Text>
+                </View>
+                <Campo rotulo="E-mail">
+                  <Entrada
+                    value={email}
+                    onChangeText={setEmail}
+                    autoFocus
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    returnKeyType="next"
+                    onSubmitEditing={() => campoSenha.current?.focus()}
+                    placeholder="voce@email.com"
+                  />
+                </Campo>
+                <Campo rotulo="Senha">
+                  <View>
+                    <Entrada
+                      ref={campoSenha}
+                      value={senha}
+                      onChangeText={setSenha}
+                      secureTextEntry={!verSenha}
+                      autoComplete="current-password"
+                      textContentType="password"
+                      returnKeyType="go"
+                      onSubmitEditing={enviar}
+                      placeholder="Sua senha"
+                      style={{ paddingRight: 52 }}
+                    />
+                    <Pressable
+                      onPress={() => setVerSenha((v) => !v)}
+                      accessibilityRole="button"
+                      accessibilityLabel={verSenha ? 'Esconder senha' : 'Mostrar senha'}
+                      style={st.olho}
+                    >
+                      <Icone nome={verSenha ? 'eye-off-outline' : 'eye-outline'} tamanho={20} cor={cores.texto3} />
+                    </Pressable>
+                  </View>
+                </Campo>
+                <Pressable onPress={() => router.push('/recuperar-senha')} hitSlop={10} style={{ alignSelf: 'flex-end' }}>
+                  <Text style={st.link}>Esqueci a senha</Text>
+                </Pressable>
+                {erro ? <Erro texto={erro} /> : null}
+                <Botao onPress={enviar} carregando={enviando}>Entrar</Botao>
+              </>
+            ) : (
+              <>
+                <BotaoGoogle aoTocar={comGoogle} carregando={google} />
+                <Ou />
+                <Botao variante="fantasma" icone="mail-outline" onPress={() => trocarModo('email')}>
+                  Entrar com e-mail
+                </Botao>
+                {erro ? <Erro texto={erro} /> : null}
+              </>
+            )}
+
+            <Pressable onPress={() => router.push('/criar-conta')} hitSlop={8} style={st.criar}>
+              <Text style={st.criarTexto}>
+                Novo por aqui? <Text style={st.link}>Criar conta</Text>
+              </Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
 
+function Erro({ texto }: { texto: string }) {
+  const { cores } = useTema()
+  const st = useSt()
+  return (
+    <View style={st.erro} accessibilityLiveRegion="polite">
+      <Icone nome="alert-circle" tamanho={18} cor={cores.perigo} />
+      <Text style={st.erroTexto}>{texto}</Text>
+    </View>
+  )
+}
+
 const useSt = criarEstilos((cores) => ({
-  tela: { flexGrow: 1, justifyContent: 'center', padding: 20, gap: 20 },
-  topo: { alignItems: 'center', gap: 8, marginBottom: 4 },
-  nomeApp: { color: '#FFFFFF', fontSize: 26, ...f[800], letterSpacing: -0.5, marginTop: 6 },
-  slogan: { color: cores.tintaTexto, fontSize: 14, ...f[400], textAlign: 'center' },
-  caixa: { backgroundColor: cores.superficie, borderRadius: 24, padding: 20, gap: 14 },
-  titulo: { fontSize: 20, ...f[800], color: cores.texto1 },
-  olho: { position: 'absolute', right: 4, top: 0, bottom: 0, width: 56, alignItems: 'center', justifyContent: 'center' },
-  link: { fontSize: 13, ...f[700], color: cores.marcaTexto },
-  erro: { fontSize: 13, ...f[600], color: cores.perigo },
-  criar: { alignItems: 'center', paddingVertical: 8 },
-  criarTexto: { color: cores.tintaTexto, fontSize: 14, ...f[500] },
+  tela: { flex: 1, backgroundColor: cores.tinta },
+  topo: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 24, paddingTop: 16 },
+  nomeApp: { color: '#FFFFFF', fontSize: 18, ...f[800], letterSpacing: -0.3 },
+  hero: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 24, gap: 10 },
+  heroCompacto: { justifyContent: 'flex-end', paddingTop: 32 },
+  titulo: { color: '#FFFFFF', fontSize: 30, lineHeight: 36, ...f[800], letterSpacing: -0.8, marginTop: 8 },
+  tituloCompacto: { fontSize: 24, lineHeight: 30 },
+  subtitulo: { color: cores.tintaTexto, fontSize: 15, lineHeight: 22, ...f[400] },
+  folha: {
+    backgroundColor: cores.superficie,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    gap: 14,
+  },
+  folhaTopo: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: -12, marginTop: -8 },
+  folhaTitulo: { fontSize: 17, ...f[800], color: cores.texto1 },
+  olho: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 50, alignItems: 'center', justifyContent: 'center' },
+  link: { fontSize: 14, ...f[700], color: cores.marcaTexto },
+  erro: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: cores.perigoFundo, borderRadius: 12, padding: 12 },
+  erroTexto: { flex: 1, fontSize: 13, ...f[600], color: cores.perigo },
+  criar: { alignItems: 'center', paddingVertical: 6 },
+  criarTexto: { fontSize: 14, ...f[500], color: cores.texto2 },
 }))

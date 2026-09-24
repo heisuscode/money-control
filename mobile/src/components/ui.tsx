@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { router } from 'expo-router'
-import type { ComponentProps, ReactElement, ReactNode } from 'react'
+import type { ComponentProps, ReactElement, ReactNode, Ref } from 'react'
 import {
   ActivityIndicator,
   Modal,
@@ -207,7 +207,7 @@ export function Campo({ rotulo, dica, erro, children }: { rotulo: string; dica?:
   )
 }
 
-export function Entrada(props: TextInputProps) {
+export function Entrada(props: TextInputProps & { ref?: Ref<TextInput> }) {
   const { cores } = useTema()
   const s = useS()
   return <TextInput placeholderTextColor={cores.texto3} {...props} style={[s.entrada, props.style]} />
