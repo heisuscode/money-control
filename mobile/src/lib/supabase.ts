@@ -12,6 +12,8 @@ export const supabase = createClient(url, chave, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // Login com Google volta ao app com um código, trocado pela sessão (OAuth PKCE).
+    flowType: 'pkce',
   },
 })
 

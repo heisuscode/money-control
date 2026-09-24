@@ -28,6 +28,7 @@ function Navegacao() {
         <Stack.Protected guard={!sessao}>
           <Stack.Screen name="login" />
         </Stack.Protected>
+        <Stack.Screen name="auth-callback" />
       </Stack>
     </DadosProvider>
   )

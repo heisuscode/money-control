@@ -6,11 +6,20 @@ import { useAuth } from '~/context/AuthProvider'
 import { cores } from '~/theme'
 
 export default function Login() {
-  const { entrar } = useAuth()
+  const { entrar, entrarComGoogle } = useAuth()
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [google, setGoogle] = useState(false)
+
+  async function comGoogle() {
+    setErro(null)
+    setGoogle(true)
+    const falha = await entrarComGoogle()
+    setGoogle(false)
+    if (falha) setErro(falha)
+  }
 
   async function enviar() {
     setErro(null)
@@ -31,6 +40,12 @@ export default function Login() {
         <View style={st.caixa}>
           <Text style={st.titulo}>Bem-vindo de volta</Text>
           <Text style={st.sub}>Use a mesma conta do site.</Text>
+          <Botao variante="fantasma" onPress={comGoogle} carregando={google}>Continuar com Google</Botao>
+          <View style={st.ou}>
+            <View style={st.traco} />
+            <Text style={st.ouTexto}>ou com e-mail</Text>
+            <View style={st.traco} />
+          </View>
           <Campo rotulo="E-mail">
             <Entrada
               value={email}
@@ -58,4 +73,7 @@ const st = StyleSheet.create({
   caixa: { backgroundColor: cores.superficie, borderRadius: 22, padding: 20, gap: 14 },
   titulo: { fontSize: 20, fontWeight: '800', color: cores.texto1 },
   sub: { fontSize: 13, color: cores.texto3, marginTop: -8 },
+  ou: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  traco: { flex: 1, height: 1, backgroundColor: cores.linha },
+  ouTexto: { fontSize: 12, color: cores.texto3 },
 })
