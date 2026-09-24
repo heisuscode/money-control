@@ -109,7 +109,8 @@ export default function Contas() {
                 const dias = daysUntil(c.vencimento)
                 const virtual = isVirtual(c)
                 const recorrente = virtual && c.origem === 'recorrencia'
-                const soDetalhes = recorrente || (virtual && !!c.faturaAberta)
+                const soDetalhes = recorrente
+                const adiantar = virtual && !!c.faturaAberta
                 return (
                   <div
                     key={c.id}
@@ -144,6 +145,9 @@ export default function Contas() {
                             : dias === 0
                               ? 'Vence hoje'
                               : `Vence em ${dias} dia(s)`}
+                        {!pago && virtual && (c.pagoFatura ?? 0) > 0 && (
+                          <span className="text-success"> · já pago {formatCurrency(c.pagoFatura ?? 0)}</span>
+                        )}
                       </div>
                     </div>
                     <span className="num text-[14px] font-semibold text-text-1">
@@ -155,11 +159,11 @@ export default function Contas() {
                       </span>
                     ) : (
                       <Button
-                        variant={soDetalhes ? 'ghost' : 'primary'}
+                        variant={soDetalhes || adiantar ? 'ghost' : 'primary'}
                         className="!px-4 !py-2 text-[13px]"
                         onClick={() => setPagando(c)}
                       >
-                        {soDetalhes ? 'Detalhes' : 'Pagar'}
+                        {soDetalhes ? 'Detalhes' : adiantar ? 'Adiantar' : 'Pagar'}
                       </Button>
                     )}
                     {!virtual && (

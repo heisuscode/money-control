@@ -178,44 +178,81 @@ export function chaveFatura(cartaoId: string, fimCiclo: string) {
   return `${cartaoId}_${fimCiclo}`
 }
 
+/** Quanto já foi pago numa fatura (pode ser em várias vezes, inclusive adiantado). */
+export interface PagoNaFatura {
+  total: number
+}
+
 export interface FaturaFechada {
   chave: string
   ciclo: Ciclo
   total: number
+  /** soma dos pagamentos desta fatura */
+  pago: number
+  /** o que ainda falta pagar */
+  restante: number
   paga: boolean
 }
 
+export interface FaturaAberta {
+  chave: string
+  ciclo: Ciclo
+  total: number
+  /** pago adiantado, antes do fechamento */
+  pago: number
+  restante: number
+}
+
 export interface ResumoCartao {
-  aberta: { ciclo: Ciclo; total: number }
+  aberta: FaturaAberta
   fechadas: FaturaFechada[]
+  /** o que falta pagar na fatura aberta + nas fechadas */
   emAberto: number
   /** parcelas de compras parceladas que ainda vão cair nas próximas faturas */
   parcelasFuturas: number
   disponivel: number
 }
 
+/** Diferença abaixo de meio centavo conta como quitada (arredondamentos). */
+const QUITADA = 0.005
+
 /**
  * Situação completa do cartão: fatura aberta, faturas fechadas e limite disponível.
+ * Uma fatura pode ser paga em várias vezes, inclusive antes de fechar (adiantado):
+ * o que já foi pago abate do total e libera limite na hora, como no banco.
  * Faturas que venceram antes do cartão ser cadastrado são histórico (quitadas fora
  * do app) e não aparecem como pendentes.
  */
 export function resumoCartao(
   cart: Cartao,
   despesas: Mov[],
-  faturasPagas: Record<string, unknown>,
+  faturasPagas: Record<string, PagoNaFatura | undefined>,
   recorrencias: Recorrencia[] = [],
 ): ResumoCartao {
   const cadastradoEm = iso(new Date(cart.criado_em))
+  const pagoEm = (chave: string) => centavos(Number(faturasPagas[chave]?.total ?? 0))
   const cAberto = cicloAberto(cart)
-  const aberta = { ciclo: cAberto, total: totalNoPeriodo(cart.id, cAberto, despesas) }
+  const chaveAberta = chaveFatura(cart.id, iso(cAberto.fim))
+  const totalAberta = totalNoPeriodo(cart.id, cAberto, despesas)
+  const pagoAberta = pagoEm(chaveAberta)
+  const aberta: FaturaAberta = {
+    chave: chaveAberta,
+    ciclo: cAberto,
+    total: totalAberta,
+    pago: pagoAberta,
+    restante: Math.max(0, centavos(totalAberta - pagoAberta)),
+  }
   const fechadas = ciclosFechados(cart, 12)
-    .map((ciclo) => {
+    .map((ciclo): FaturaFechada => {
       const chave = chaveFatura(cart.id, iso(ciclo.fim))
-      return { chave, ciclo, total: totalNoPeriodo(cart.id, ciclo, despesas), paga: !!faturasPagas[chave] }
+      const total = totalNoPeriodo(cart.id, ciclo, despesas)
+      const pago = pagoEm(chave)
+      const restante = Math.max(0, centavos(total - pago))
+      return { chave, ciclo, total, pago, restante, paga: restante < QUITADA }
     })
     .filter((f) => f.total > 0)
     .filter((f) => f.paga || iso(f.ciclo.vencimento) >= cadastradoEm)
-  const emAberto = aberta.total + fechadas.filter((f) => !f.paga).reduce((a, f) => a + f.total, 0)
+  const emAberto = centavos(aberta.restante + fechadas.filter((f) => !f.paga).reduce((a, f) => a + f.restante, 0))
   // Como no banco: a compra parcelada ocupa o limite pelo valor total, e cada
   // parcela paga libera a sua parte.
   const parcelasFuturas = recorrencias

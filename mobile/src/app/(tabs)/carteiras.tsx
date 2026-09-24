@@ -17,7 +17,7 @@ export default function Carteiras() {
   const { dinheiro } = usePreferencias()
   const [atualizando, setAtualizando] = useState(false)
 
-  const saldo = (c: Carteira) => saldoCarteira(c, d.receitas, d.despesas, d.pagamentosFatura)
+  const saldo = (c: Carteira) => saldoCarteira(c, d.receitas, d.despesas, d.pagamentos)
   const contas = d.carteiras.filter((c) => c.tipo !== 'cartao_credito')
   const cartoes = d.carteiras.filter((c) => c.tipo === 'cartao_credito')
   const saldoContas = contas.reduce((a, c) => a + saldo(c), 0)

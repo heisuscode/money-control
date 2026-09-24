@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AppState } from 'react-native'
 import * as api from '@/financeiro/api'
-import { indexarPagamentos, montarContasVirtuais } from '@/financeiro/contasVirtuais'
+import { indexarPagamentos, montarContasVirtuais, type PagamentosDaFatura } from '@/financeiro/contasVirtuais'
 import { daysUntil } from '@/lib/format'
 import type {
   Carteira,
@@ -40,7 +40,10 @@ interface DadosCtx {
   contas: Conta[]
   carteiras: Carteira[]
   recorrencias: Recorrencia[]
-  pagamentosFatura: Record<string, PagamentoFatura>
+  /** pagamentos agrupados por fatura (soma, último, itens) */
+  pagamentosFatura: Record<string, PagamentosDaFatura>
+  /** todos os pagamentos de fatura (saldo das contas pagadoras) */
+  pagamentos: PagamentoFatura[]
   contasVirtuais: ContaVirtual[]
   metas: Meta[]
   notificacoes: Notificacao[]
@@ -208,6 +211,7 @@ export function DadosProvider({ children }: { children: ReactNode }) {
     carteiras,
     recorrencias,
     pagamentosFatura,
+    pagamentos,
     contasVirtuais,
     metas,
     notificacoes,

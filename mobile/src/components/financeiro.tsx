@@ -3,12 +3,12 @@ import { useState } from 'react'
 import { Alert, Pressable, Text, View } from 'react-native'
 import { numeroParcela } from '@/financeiro/logic'
 import { sum } from '@/lib/finance'
-import { daysUntil, formatCurrency, formatDate } from '@/lib/format'
+import { daysUntil, formatCurrency, formatDate, formatNumber, maskMoneyInput, parseMoney } from '@/lib/format'
 import type { Carteira, Categoria, Conta, ContaVirtual, Movimentacao, PagamentoFatura, Recorrencia } from '@/lib/types'
 import { useDados } from '~/context/DadosProvider'
 import { usePreferencias } from '~/context/Preferencias'
 import { criarEstilos, f, useTema } from '~/theme'
-import { Botao, Icone, ModalCentral, num, Selo, type NomeIcone } from './ui'
+import { Botao, Chips, Entrada, Icone, ModalCentral, num, Selo, type NomeIcone } from './ui'
 
 export type ContaPagavel = Conta | ContaVirtual
 
@@ -19,9 +19,9 @@ export function saldoCarteira(
   c: Carteira,
   receitas: Movimentacao[],
   despesas: Movimentacao[],
-  pagamentos: Record<string, PagamentoFatura>,
+  pagamentos: PagamentoFatura[],
 ) {
-  const faturas = Object.values(pagamentos)
+  const faturas = pagamentos
     .filter((p) => p.carteira_id === c.id)
     .reduce((a, p) => a + Number(p.valor), 0)
   return (
@@ -84,7 +84,8 @@ export function LinhaConta({
   const virtual = isVirtual(conta) ? conta : null
   const recorrente = virtual?.origem === 'recorrencia'
   const fatura = virtual?.origem === 'fatura'
-  const podePagar = botaoPagar && !pago && !recorrente && !virtual?.faturaAberta
+  const podePagar = botaoPagar && !pago && !recorrente
+  const adiantar = !!virtual?.faturaAberta
   return (
     <Pressable
       onPress={aoTocar}
@@ -109,7 +110,7 @@ export function LinhaConta({
         <Text style={[st.valor, num]}>{dinheiro(Number(conta.valor))}</Text>
         {podePagar ? (
           <View style={st.pagar}>
-            <Text style={st.pagarTexto}>Pagar</Text>
+            <Text style={st.pagarTexto}>{adiantar ? 'Adiantar' : 'Pagar'}</Text>
           </View>
         ) : null}
       </View>
@@ -177,30 +178,38 @@ export function MiniCartao({ cor, largura = 36 }: { cor: string; largura?: numbe
 export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; aoFechar: () => void }) {
   const { cores } = useTema()
   const st = useSt()
-  const { carteiras, pagarFatura, marcarContaPaga, receitas, despesas, pagamentosFatura } = useDados()
+  const { carteiras, pagarFatura, marcarContaPaga, receitas, despesas, pagamentos } = useDados()
   const pagadoras = carteiras.filter((c) => c.tipo !== 'cartao_credito')
   const [pagadora, setPagadora] = useState('')
+  const [valorStr, setValorStr] = useState('')
   const [pagando, setPagando] = useState(false)
 
-  // Nova conta aberta: sugere a primeira conta bancária como pagadora.
+  // Nova conta aberta: sugere a primeira conta bancária e o valor que falta pagar.
   const [contaAtual, setContaAtual] = useState<string | null>(null)
   if (conta && conta.id !== contaAtual) {
     setContaAtual(conta.id)
     setPagadora(pagadoras[0]?.id ?? '')
+    setValorStr(formatNumber(Number(conta.valor)))
   }
+  if (!conta && contaAtual !== null) setContaAtual(null)
 
   const virtual = conta && isVirtual(conta) ? conta : null
   const recorrencia = virtual?.origem === 'recorrencia'
   const fatura = virtual?.origem === 'fatura'
   const aberta = !!virtual?.faturaAberta
+  // fatura pode ser paga em partes e adiantada; o `valor` da conta é o que falta
+  const restante = Number(conta?.valor ?? 0)
+  const pagoAntes = virtual?.pagoFatura ?? 0
+  const valor = parseMoney(valorStr)
+  const valorInvalido = fatura && (valor <= 0 || valor > restante + 0.001)
 
   async function confirmar() {
-    if (!conta) return
+    if (!conta || valorInvalido) return
     setPagando(true)
     try {
       if (virtual) {
         if (!virtual.cartaoId || !virtual.fimCiclo) return
-        await pagarFatura(virtual.cartaoId, virtual.fimCiclo, pagadora || null, Number(conta.valor))
+        await pagarFatura(virtual.cartaoId, virtual.fimCiclo, pagadora || null, valor)
       } else {
         await marcarContaPaga(conta.id)
       }
@@ -217,7 +226,7 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
     destino()
   }
 
-  const titulo = aberta ? 'Fatura em aberto' : recorrencia ? 'Conta recorrente' : fatura ? 'Pagar fatura' : 'Pagar conta'
+  const titulo = aberta ? 'Pagar adiantado' : recorrencia ? 'Conta recorrente' : fatura ? 'Pagar fatura' : 'Pagar conta'
 
   return (
     <ModalCentral visivel={!!conta} aoFechar={aoFechar} titulo={titulo}>
@@ -225,24 +234,17 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
         <>
           <View style={st.resumo}>
             <Text style={st.sub}>{conta.descricao}</Text>
-            <Text style={[st.resumoValor, num]}>{formatCurrency(Number(conta.valor))}</Text>
-            <Text style={st.sub}>Vence em {formatDate(conta.vencimento, "dd 'de' MMMM")}</Text>
+            <Text style={[st.resumoValor, num]}>{formatCurrency(restante)}</Text>
+            <Text style={st.sub}>
+              {aberta ? `Fecha em ${formatDate(virtual!.fechaEm!, 'dd/MM')} · vence ` : 'Vence em '}
+              {formatDate(conta.vencimento, "dd 'de' MMMM")}
+            </Text>
+            {fatura && pagoAntes > 0 ? (
+              <Text style={[st.sub, { color: cores.sucesso, ...f[600] }]}>Já pago {formatCurrency(pagoAntes)}</Text>
+            ) : null}
           </View>
 
-          {aberta ? (
-            <>
-              <Text style={st.texto}>
-                Esta fatura ainda recebe compras e fecha em {formatDate(virtual!.fechaEm!, 'dd/MM')}. O pagamento fica
-                disponível depois do fechamento, com o valor final.
-              </Text>
-              <Botao
-                icone="card-outline"
-                onPress={() => irPara(() => router.push({ pathname: '/cartao/[id]', params: { id: virtual!.cartaoId! } }))}
-              >
-                Ver fatura
-              </Botao>
-            </>
-          ) : recorrencia ? (
+          {recorrencia ? (
             <>
               <Text style={st.texto}>Esta conta é lançada sozinha na data. Para mudar o valor ou pausar, use Recorrências.</Text>
               <Botao variante="fantasma" onPress={() => irPara(() => router.push('/recorrencias'))}>
@@ -251,9 +253,38 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
             </>
           ) : (
             <>
+              {aberta ? (
+                <View style={st.aviso}>
+                  <Icone nome="flash-outline" tamanho={18} cor={cores.marcaTexto} />
+                  <Text style={[st.texto, { flex: 1, fontSize: 12, lineHeight: 17 }]}>
+                    A fatura ainda recebe compras. O que você pagar agora abate do valor final e libera limite na hora.
+                  </Text>
+                </View>
+              ) : null}
               {fatura && (
                 <View style={{ gap: 8 }}>
-                  <Text style={st.rotulo}>Pagar com</Text>
+                  <Text style={st.rotulo}>Valor do pagamento</Text>
+                  <Entrada
+                    value={valorStr}
+                    onChangeText={(t) => setValorStr(maskMoneyInput(t))}
+                    keyboardType="numeric"
+                    accessibilityLabel="Valor do pagamento"
+                    style={{ fontSize: 18, ...f[700] }}
+                  />
+                  <Chips
+                    valor={valorStr}
+                    aoMudar={setValorStr}
+                    opcoes={[
+                      { valor: formatNumber(restante), rotulo: `Tudo · ${formatCurrency(restante)}` },
+                      { valor: formatNumber(Math.round(restante * 50) / 100), rotulo: 'Metade' },
+                    ]}
+                  />
+                  {valorInvalido ? (
+                    <Text style={[st.sub, { color: cores.perigo }]}>Informe um valor entre R$ 0,01 e {formatCurrency(restante)}.</Text>
+                  ) : valor < restante - 0.001 ? (
+                    <Text style={st.sub}>Depois deste pagamento ainda faltam {formatCurrency(restante - valor)}.</Text>
+                  ) : null}
+                  <Text style={[st.rotulo, { marginTop: 4 }]}>Pagar com</Text>
                   {pagadoras.length === 0 ? (
                     <Text style={st.sub}>Nenhuma conta cadastrada: o pagamento fica sem conta de origem.</Text>
                   ) : (
@@ -270,7 +301,7 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
                           <View style={[st.radio, ativo && st.radioAtivo]} />
                           <View style={{ flex: 1 }}>
                             <Text style={st.descricao}>{c.nome}</Text>
-                            <Text style={st.sub}>Saldo {formatCurrency(saldoCarteira(c, receitas, despesas, pagamentosFatura))}</Text>
+                            <Text style={st.sub}>Saldo {formatCurrency(saldoCarteira(c, receitas, despesas, pagamentos))}</Text>
                           </View>
                         </Pressable>
                       )
@@ -285,9 +316,17 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
                   </View>
                 </View>
               )}
-              <Botao onPress={confirmar} carregando={pagando}>
-                {fatura ? `Pagar ${formatCurrency(Number(conta.valor))}` : 'Marcar como paga'}
+              <Botao onPress={confirmar} carregando={pagando} desabilitado={!!valorInvalido}>
+                {fatura ? `${aberta ? 'Pagar adiantado' : 'Pagar'} ${formatCurrency(valor)}` : 'Marcar como paga'}
               </Botao>
+              {aberta ? (
+                <Botao
+                  variante="texto"
+                  onPress={() => irPara(() => router.push({ pathname: '/cartao/[id]', params: { id: virtual!.cartaoId! } }))}
+                >
+                  Ver compras da fatura
+                </Botao>
+              ) : null}
             </>
           )}
         </>

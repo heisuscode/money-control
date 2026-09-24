@@ -20,7 +20,7 @@ const CORES = ['#004AAD', '#16A34A', '#820AD1', '#E5484D', '#F59E0B', '#06B6D4',
 
 export default function CarteirasPage() {
   const { receitas, despesas, loading: carregandoDados } = useData()
-  const { carteiras, recorrencias, removerCarteira, pagamentosFatura, loading: carregandoCarteiras, erro } = useFinanceiro()
+  const { carteiras, recorrencias, removerCarteira, pagamentosFatura, pagamentos, loading: carregandoCarteiras, erro } = useFinanceiro()
   const toast = useToast()
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState<Carteira | null>(null)
@@ -30,7 +30,7 @@ export default function CarteirasPage() {
 
   // saldo = inicial + receitas − despesas − faturas de cartão pagas com esta conta
   function saldo(c: Carteira) {
-    const faturasPagasAqui = Object.values(pagamentosFatura)
+    const faturasPagasAqui = pagamentos
       .filter((p) => p.carteira_id === c.id)
       .reduce((a, p) => a + Number(p.valor), 0)
     return (
@@ -171,6 +171,11 @@ function CartaoInfo({ cartao }: { cartao: Carteira }) {
       <div>
         <div className="text-[11px] text-text-3">Fatura atual · fecha {formatDate(r.aberta.ciclo.fim, 'dd/MM')}</div>
         <div className="num text-[22px] font-bold text-text-1">{formatCurrency(r.aberta.total)}</div>
+        {r.aberta.pago > 0 && (
+          <div className="text-[12px] font-semibold text-success">
+            Pago adiantado {formatCurrency(r.aberta.pago)} · falta {formatCurrency(r.aberta.restante)}
+          </div>
+        )}
       </div>
       <div className="h-2 rounded-full bg-subtle">
         <div className="h-2 rounded-full" style={{ width: `${usoPct}%`, background: usoPct > 90 ? '#E5484D' : cartao.cor }} />
@@ -187,8 +192,11 @@ function CartaoInfo({ cartao }: { cartao: Carteira }) {
       )}
       {pendentes.map((f) => (
         <div key={f.chave} className="flex items-center justify-between rounded-lg bg-warning/10 px-2.5 py-1.5 text-[12px]">
-          <span className="text-text-2">Fatura fechada · vence {formatDate(f.ciclo.vencimento, 'dd/MM')}</span>
-          <b className="num text-text-1">{formatCurrency(f.total)}</b>
+          <span className="text-text-2">
+            Fatura fechada · vence {formatDate(f.ciclo.vencimento, 'dd/MM')}
+            {f.pago > 0 ? ` · falta pagar` : ''}
+          </span>
+          <b className="num text-text-1">{formatCurrency(f.restante)}</b>
         </div>
       ))}
       <div className="text-[11px] text-text-3">

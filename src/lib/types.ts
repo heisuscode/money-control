@@ -105,8 +105,12 @@ export type ContaVirtual = Conta & {
   origem: 'fatura' | 'recorrencia'
   cartaoId?: string
   fimCiclo?: string
-  /** fatura do ciclo atual: ainda recebe compras, só pode ser paga depois de fechar */
+  /** fatura do ciclo atual: ainda recebe compras; pode ser paga adiantado */
   faturaAberta?: boolean
+  /** fatura: valor total do ciclo (o `valor` é o que ainda falta pagar) */
+  totalFatura?: number
+  /** fatura: quanto já foi pago (em uma ou mais vezes) */
+  pagoFatura?: number
   fechaEm?: string
   recorrenciaId?: string
 }

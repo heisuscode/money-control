@@ -5,7 +5,7 @@ import { runNotificationEngine } from '@/lib/notifications'
 import { supabase } from '@/lib/supabase'
 import type { Carteira, ContaVirtual, PagamentoFatura, Recorrencia } from '@/lib/types'
 import * as api from './api'
-import { indexarPagamentos, montarContasVirtuais } from './contasVirtuais'
+import { indexarPagamentos, montarContasVirtuais, type PagamentosDaFatura } from './contasVirtuais'
 
 export type { CarteiraInput, RecorrenciaInput } from './api'
 
@@ -14,8 +14,10 @@ interface FinanceiroCtx {
   erro: string | null
   carteiras: Carteira[]
   recorrencias: Recorrencia[]
-  /** pagamentos por chave de fatura (`${cartaoId}_${fimCiclo}`) */
-  pagamentosFatura: Record<string, PagamentoFatura>
+  /** pagamentos agrupados por chave de fatura (`${cartaoId}_${fimCiclo}`) */
+  pagamentosFatura: Record<string, PagamentosDaFatura>
+  /** todos os pagamentos de fatura (para o saldo das contas pagadoras) */
+  pagamentos: PagamentoFatura[]
   salvarCarteira: (dados: api.CarteiraInput, id?: string) => Promise<void>
   removerCarteira: (id: string) => Promise<void>
   salvarRecorrencia: (dados: api.RecorrenciaInput, id?: string) => Promise<Recorrencia>
@@ -179,6 +181,7 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
       carteiras,
       recorrencias,
       pagamentosFatura,
+      pagamentos,
       salvarCarteira,
       removerCarteira,
       salvarRecorrencia,
@@ -187,7 +190,7 @@ export function FinanceiroProvider({ children }: { children: ReactNode }) {
       registrarTransacao,
       contasVirtuais,
     }),
-    [loading, erro, carteiras, recorrencias, pagamentosFatura, salvarCarteira, removerCarteira, salvarRecorrencia, removerRecorrencia, pagarFatura, registrarTransacao, contasVirtuais],
+    [loading, erro, carteiras, recorrencias, pagamentosFatura, pagamentos, salvarCarteira, removerCarteira, salvarRecorrencia, removerRecorrencia, pagarFatura, registrarTransacao, contasVirtuais],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

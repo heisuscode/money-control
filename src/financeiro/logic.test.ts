@@ -160,8 +160,26 @@ describe('resumoCartao', () => {
   })
 
   it('fatura paga libera o limite', () => {
-    const r = resumoCartao(cartao(10, 17), despesas, { 'c1_2026-02-10': {} })
+    const r = resumoCartao(cartao(10, 17), despesas, { 'c1_2026-02-10': { total: 300 } })
     expect(r.emAberto).toBe(200)
+  })
+
+  it('pagamento parcial deixa o restante em aberto', () => {
+    const r = resumoCartao(cartao(10, 17), despesas, { 'c1_2026-02-10': { total: 100 } })
+    expect(r.fechadas[0]).toMatchObject({ total: 300, pago: 100, restante: 200, paga: false })
+    expect(r.emAberto).toBe(400)
+  })
+
+  it('pagamento adiantado abate da fatura aberta e libera limite', () => {
+    const r = resumoCartao(cartao(10, 17), despesas, { 'c1_2026-03-10': { total: 150 } })
+    expect(r.aberta).toMatchObject({ total: 200, pago: 150, restante: 50 })
+    expect(r.emAberto).toBe(50 + 300)
+    expect(r.disponivel).toBe(5000 - 350)
+  })
+
+  it('adiantar mais do que a fatura não deixa o restante negativo', () => {
+    const r = resumoCartao(cartao(10, 17), despesas, { 'c1_2026-03-10': { total: 250 } })
+    expect(r.aberta.restante).toBe(0)
   })
 
   it('faturas vencidas antes do cadastro do cartão são histórico', () => {

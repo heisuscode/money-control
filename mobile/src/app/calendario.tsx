@@ -1,10 +1,9 @@
-import { router } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { iso } from '@/financeiro/logic'
 import { sum } from '@/lib/finance'
 import { formatDate } from '@/lib/format'
-import { isVirtual, LinhaConta, PagarConta, type ContaPagavel } from '~/components/financeiro'
+import { LinhaConta, PagarConta, type ContaPagavel } from '~/components/financeiro'
 import { SeletorMes } from '~/components/SeletorMes'
 import { Cartao, Tela, Vazio, num } from '~/components/ui'
 import { useDados } from '~/context/DadosProvider'
@@ -43,9 +42,7 @@ export default function Calendario() {
   const pendentesMes = [...porDia.entries()].filter(([k]) => k.startsWith(prefixo)).flatMap(([, v]) => v).filter((c) => c.status !== 'pago')
 
   function tocar(c: ContaPagavel) {
-    if (isVirtual(c) && c.origem === 'fatura' && c.faturaAberta && c.cartaoId) {
-      router.push({ pathname: '/cartao/[id]', params: { id: c.cartaoId } })
-    } else if (c.status !== 'pago') setPagar(c)
+    if (c.status !== 'pago') setPagar(c)
   }
 
   return (

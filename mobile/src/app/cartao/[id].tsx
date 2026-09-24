@@ -96,7 +96,7 @@ export default function CartaoDetalhe() {
   const compras = comprasDoCiclo(cicloAtual)
   const recorrencia = (rid?: string | null) => (rid ? d.recorrencias.find((r) => r.id === rid) : undefined)
 
-  function pagarFechada(fimCiclo: Date) {
+  function abrirPagamento(fimCiclo: Date) {
     const conta = d.contasVirtuais.find((c) => c.cartaoId === cartao!.id && c.fimCiclo === iso(fimCiclo))
     if (conta) setPagar(conta)
   }
@@ -116,12 +116,16 @@ export default function CartaoDetalhe() {
       }
       rodape={
         fechadaPendente ? (
-          <Botao onPress={() => pagarFechada(fechadaPendente.ciclo.fim)}>
-            {`Pagar fatura de ${formatDate(fechadaPendente.ciclo.vencimento, 'dd/MM')} · ${dinheiro(fechadaPendente.total)}`}
+          <Botao onPress={() => abrirPagamento(fechadaPendente.ciclo.fim)}>
+            {`Pagar fatura de ${formatDate(fechadaPendente.ciclo.vencimento, 'dd/MM')} · ${dinheiro(fechadaPendente.restante)}`}
+          </Botao>
+        ) : resumo.aberta.restante > 0 ? (
+          <Botao icone="flash-outline" onPress={() => abrirPagamento(cicloAtual.fim)}>
+            Adiantar pagamento
           </Botao>
         ) : (
-          <Botao desabilitado variante="fantasma">
-            {`Pagar após o fechamento (${formatDate(cicloAtual.fim, 'dd/MM')})`}
+          <Botao desabilitado variante="fantasma" icone="checkmark-circle-outline">
+            Fatura atual quitada
           </Botao>
         )
       }
@@ -129,6 +133,13 @@ export default function CartaoDetalhe() {
       <View style={[st.hero, { backgroundColor: fundoComTextoBranco(cartao.cor) }]}>
         <Text style={st.heroRotulo}>Fatura atual</Text>
         <Text style={[st.heroValor, num]}>{dinheiro(resumo.aberta.total)}</Text>
+        {resumo.aberta.pago > 0 ? (
+          <View style={st.heroPago}>
+            <Text style={st.heroPagoTexto}>
+              Pago adiantado {dinheiro(resumo.aberta.pago)} · falta {dinheiro(resumo.aberta.restante)}
+            </Text>
+          </View>
+        ) : null}
         <View style={st.heroDatas}>
           <View>
             <Text style={st.heroRotulo}>Fecha</Text>
@@ -218,7 +229,7 @@ export default function CartaoDetalhe() {
             <Pressable
               key={x.chave}
               disabled={x.paga}
-              onPress={() => pagarFechada(x.ciclo.fim)}
+              onPress={() => abrirPagamento(x.ciclo.fim)}
               style={({ pressed }) => [st.fechada, i > 0 && st.divisor, pressed && { opacity: 0.6 }]}
             >
               <View style={{ flex: 1 }}>
@@ -226,7 +237,8 @@ export default function CartaoDetalhe() {
                 <Text style={st.sub}>Venceu/vence {formatDate(x.ciclo.vencimento, 'dd/MM/yyyy')}</Text>
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                <Text style={[st.forte, num]}>{dinheiro(x.total)}</Text>
+                <Text style={[st.forte, num]}>{dinheiro(x.paga ? x.total : x.restante)}</Text>
+                {!x.paga && x.pago > 0 ? <Text style={st.sub}>de {dinheiro(x.total)}</Text> : null}
                 {x.paga ? (
                   <Selo texto="Paga" cor={cores.sucesso} fundo={cores.sucessoFundo} />
                 ) : (
@@ -262,6 +274,8 @@ const useSt = criarEstilos((cores) => ({
   heroRotulo: { color: 'rgba(255,255,255,0.85)', fontSize: 12, ...f[500] },
   heroValor: { color: '#FFFFFF', fontSize: 34, ...f[800], letterSpacing: -1, marginTop: 2 },
   heroDatas: { flexDirection: 'row', gap: 32, marginTop: 14 },
+  heroPago: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginTop: 6 },
+  heroPagoTexto: { color: '#FFFFFF', fontSize: 12, ...f[700] },
   heroData: { color: '#FFFFFF', fontSize: 15, ...f[700], marginTop: 2 },
   forte: { fontSize: 14, ...f[700], color: cores.texto1, textTransform: 'none' },
   sub: { fontSize: 13, ...f[400], color: cores.texto2, flexShrink: 1 },

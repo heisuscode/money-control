@@ -2,9 +2,25 @@ import { daysUntil } from '@/lib/format'
 import type { Carteira, ContaVirtual, Movimentacao, PagamentoFatura, Recorrencia } from '@/lib/types'
 import { chaveFatura, iso, proximaOcorrencia, recorrenciaConcluida, resumoCartao } from './logic'
 
-/** Pagamentos indexados pela chave da fatura (`${cartaoId}_${fimCiclo}`). */
-export function indexarPagamentos(pagamentos: PagamentoFatura[]): Record<string, PagamentoFatura> {
-  return Object.fromEntries(pagamentos.map((p) => [chaveFatura(p.cartao_id, p.fim_ciclo), p]))
+/** Pagamentos de uma fatura: pode ser paga em várias vezes, inclusive adiantado. */
+export interface PagamentosDaFatura {
+  total: number
+  /** data do último pagamento */
+  ultimo: string
+  itens: PagamentoFatura[]
+}
+
+/** Pagamentos agrupados pela chave da fatura (`${cartaoId}_${fimCiclo}`). */
+export function indexarPagamentos(pagamentos: PagamentoFatura[]): Record<string, PagamentosDaFatura> {
+  const mapa: Record<string, PagamentosDaFatura> = {}
+  for (const p of pagamentos) {
+    const chave = chaveFatura(p.cartao_id, p.fim_ciclo)
+    const atual = (mapa[chave] ??= { total: 0, ultimo: p.data, itens: [] })
+    atual.total = Math.round((atual.total + Number(p.valor)) * 100) / 100
+    if (p.data > atual.ultimo) atual.ultimo = p.data
+    atual.itens.push(p)
+  }
+  return mapa
 }
 
 /**
@@ -16,7 +32,7 @@ export function montarContasVirtuais(
   carteiras: Carteira[],
   recorrencias: Recorrencia[],
   despesas: Pick<Movimentacao, 'data' | 'valor' | 'carteira_id'>[],
-  pagamentosFatura: Record<string, PagamentoFatura>,
+  pagamentosFatura: Record<string, PagamentosDaFatura>,
 ): ContaVirtual[] {
   const status = (venc: string, paga: boolean): ContaVirtual['status'] =>
     paga ? 'pago' : daysUntil(venc) < 0 ? 'atrasado' : 'pendente'
@@ -31,10 +47,13 @@ export function montarContasVirtuais(
           id: `fatura_${f.chave}`,
           usuario_id: c.usuario_id,
           descricao: `Fatura ${c.nome}`,
-          valor: f.total,
+          // pendente mostra o que falta; quitada mostra o total pago
+          valor: f.paga ? f.total : f.restante,
+          totalFatura: f.total,
+          pagoFatura: f.pago,
           vencimento: venc,
           status: status(venc, f.paga),
-          pago_em: pagamentosFatura[f.chave]?.data ?? null,
+          pago_em: f.paga ? (pagamentosFatura[f.chave]?.ultimo ?? null) : null,
           criado_em: venc,
           virtual: true,
           origem: 'fatura',
@@ -42,13 +61,16 @@ export function montarContasVirtuais(
           fimCiclo: iso(f.ciclo.fim),
         }
       })
-      if (r.aberta.total <= 0) return fechadas
+      // aberta quitada adiantado (ou sem compras) não aparece como conta a pagar
+      if (r.aberta.restante <= 0) return fechadas
       const venc = iso(r.aberta.ciclo.vencimento)
       const aberta: ContaVirtual = {
         id: `fatura_aberta_${c.id}`,
         usuario_id: c.usuario_id,
         descricao: `Fatura ${c.nome} (em aberto)`,
-        valor: r.aberta.total,
+        valor: r.aberta.restante,
+        totalFatura: r.aberta.total,
+        pagoFatura: r.aberta.pago,
         vencimento: venc,
         status: 'pendente',
         pago_em: null,
@@ -57,6 +79,7 @@ export function montarContasVirtuais(
         origem: 'fatura',
         cartaoId: c.id,
         faturaAberta: true,
+        fimCiclo: iso(r.aberta.ciclo.fim),
         fechaEm: iso(r.aberta.ciclo.fim),
       }
       return [...fechadas, aberta]

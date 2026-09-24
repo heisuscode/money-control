@@ -56,7 +56,7 @@ export default function Calendario() {
   function subConta(c: ContaPagavel) {
     if (c.status === 'pago') return 'Já paga'
     if (isVirtual(c) && c.origem === 'recorrencia') return 'Recorrente · toque para ver'
-    if (isVirtual(c) && c.faturaAberta) return 'Fatura em aberto · ainda recebe compras'
+    if (isVirtual(c) && c.faturaAberta) return 'Fatura em aberto · toque para pagar adiantado'
     if (isVirtual(c) && c.origem === 'fatura') return 'Fatura do cartão · toque para pagar'
     return 'Vencimento · toque para pagar'
   }

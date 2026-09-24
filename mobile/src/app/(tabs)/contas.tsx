@@ -1,4 +1,3 @@
-import { router } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { RefreshControl, Text, View } from 'react-native'
 import { sum } from '@/lib/finance'
@@ -44,11 +43,7 @@ export default function Contas() {
   }, [todas, filtro])
 
   function tocar(c: ContaPagavel) {
-    if (isVirtual(c) && c.origem === 'fatura' && c.faturaAberta && c.cartaoId) {
-      router.push({ pathname: '/cartao/[id]', params: { id: c.cartaoId } })
-    } else if (c.status !== 'pago') {
-      setPagar(c)
-    }
+    if (c.status !== 'pago') setPagar(c)
   }
 
   async function atualizar() {
