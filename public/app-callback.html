@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>MoneyControl · voltando ao app</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0e1726; color: #fff; font: 16px/1.5 system-ui, sans-serif; }
+      main { text-align: center; padding: 24px; max-width: 360px; }
+      a { display: inline-block; margin-top: 16px; padding: 12px 20px; border-radius: 12px; background: #004aad; color: #fff; text-decoration: none; font-weight: 700; }
+      p { color: #93a1b7; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Voltando ao app…</h1>
+      <p id="msg">Se o app não abrir sozinho, toque no botão abaixo.</p>
+      <a id="abrir" href="#" hidden>Abrir o MoneyControl</a>
+    </main>
+    <script>
+      // Ponte do login com Google para o app: o Supabase não aceita endereços
+      // exp://IP:porta (Expo Go) como retorno, então o Google volta para esta
+      // página e ela repassa o ?code=... para o app. Só encaminha para os
+      // esquemas do próprio app (evita virar redirecionador aberto).
+      ;(function () {
+        var params = new URLSearchParams(location.search)
+        var volta = params.get('volta') || ''
+        if (!/^(exp|moneycontrol):\/\//.test(volta)) {
+          document.getElementById('msg').textContent = 'Endereço de retorno inválido.'
+          return
+        }
+        params.delete('volta')
+        var destino = volta + (volta.indexOf('?') >= 0 ? '&' : '?') + params.toString()
+        var link = document.getElementById('abrir')
+        link.href = destino
+        link.hidden = false
+        location.replace(destino)
+      })()
+    </script>
+  </body>
+</html>

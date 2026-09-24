@@ -14,10 +14,17 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null)
 
-// Endereço para onde o Google/Supabase devolve o usuário: moneycontrol://auth-callback
-// no APK e exp://<ip>:8081/--/auth-callback no Expo Go. Precisa estar liberado em
-// Supabase → Authentication → URL Configuration → Redirect URLs.
+// Endereço onde o app recebe o retorno do login: moneycontrol://auth-callback no
+// APK e exp://<ip>:8081/--/auth-callback no Expo Go.
 export const URL_RETORNO_LOGIN = Linking.createURL('auth-callback')
+
+// O Supabase aceita moneycontrol:// (liberado em Authentication → URL Configuration),
+// mas recusa exp://IP:porta mesmo liberado — e cai no site. No Expo Go o Google volta
+// para uma página ponte do site (public/app-callback.html), que repassa o código ao app.
+const PONTE = 'https://moneycontrolapp.vercel.app/app-callback.html'
+const REDIRECT_OAUTH = URL_RETORNO_LOGIN.startsWith('exp')
+  ? `${PONTE}?volta=${encodeURIComponent(URL_RETORNO_LOGIN)}`
+  : URL_RETORNO_LOGIN
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Session | null>(null)
@@ -41,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function entrarComGoogle() {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: URL_RETORNO_LOGIN, skipBrowserRedirect: true },
+      options: { redirectTo: REDIRECT_OAUTH, skipBrowserRedirect: true },
     })
     if (error || !data.url) return 'Não foi possível iniciar o login com Google.'
 
