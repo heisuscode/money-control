@@ -1,86 +1,177 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { numeroParcela } from '@/financeiro/logic'
+import { sum } from '@/lib/finance'
 import { daysUntil, formatCurrency, formatDate } from '@/lib/format'
-import type { Conta, ContaVirtual, Movimentacao } from '@/lib/types'
+import type { Carteira, Categoria, Conta, ContaVirtual, Movimentacao, PagamentoFatura, Recorrencia } from '@/lib/types'
 import { useDados } from '~/context/DadosProvider'
-import { cores, raio } from '~/theme'
-import { Botao, Campo, Chips, ModalCentral, s } from './ui'
+import { usePreferencias } from '~/context/Preferencias'
+import { cores, f } from '~/theme'
+import { Botao, Icone, ModalCentral, num, Selo, type NomeIcone } from './ui'
 
 export type ContaPagavel = Conta | ContaVirtual
 
 export const isVirtual = (c: ContaPagavel): c is ContaVirtual => 'virtual' in c && c.virtual === true
 
+/** Saldo de uma conta/dinheiro: inicial + receitas − despesas − faturas pagas com ela. */
+export function saldoCarteira(
+  c: Carteira,
+  receitas: Movimentacao[],
+  despesas: Movimentacao[],
+  pagamentos: Record<string, PagamentoFatura>,
+) {
+  const faturas = Object.values(pagamentos)
+    .filter((p) => p.carteira_id === c.id)
+    .reduce((a, p) => a + Number(p.valor), 0)
+  return (
+    Number(c.saldo_inicial) +
+    sum(receitas.filter((r) => r.carteira_id === c.id)) -
+    sum(despesas.filter((x) => x.carteira_id === c.id)) -
+    faturas
+  )
+}
+
+// Ícones de linha por palavra-chave da categoria (o banco guarda emoji, o app usa ícones).
+const ICONES_CATEGORIA: [RegExp, NomeIcone][] = [
+  [/aliment|mercado|comida|restaur|lanche|padaria/i, 'restaurant-outline'],
+  [/transport|uber|combust|gasolina|carro|ônibus|onibus/i, 'car-outline'],
+  [/moradia|casa|aluguel|condom|luz|água|agua|energia/i, 'home-outline'],
+  [/saúde|saude|farm|médic|medic|academia/i, 'medkit-outline'],
+  [/educa|curso|escola|faculdade|livro/i, 'school-outline'],
+  [/lazer|cinema|viagem|diversão|diversao|jogo/i, 'game-controller-outline'],
+  [/assinatura|streaming|netflix|spotify|internet|celular|telefone/i, 'tv-outline'],
+  [/roupa|vestu|compras|shopping/i, 'bag-handle-outline'],
+  [/pet/i, 'paw-outline'],
+  [/salár|salar|trabalho|freela/i, 'briefcase-outline'],
+  [/invest|rendimento|juros/i, 'trending-up-outline'],
+  [/presente|doação|doacao/i, 'gift-outline'],
+]
+
+export function iconeCategoria(cat: Pick<Categoria, 'nome'> | null | undefined, tipo: 'receita' | 'despesa' = 'despesa'): NomeIcone {
+  if (cat) for (const [re, ic] of ICONES_CATEGORIA) if (re.test(cat.nome)) return ic
+  return tipo === 'receita' ? 'arrow-down-outline' : 'pricetag-outline'
+}
+
 function textoVencimento(c: ContaPagavel) {
   if (c.status === 'pago') return `Paga em ${c.pago_em ? formatDate(c.pago_em, 'dd MMM') : '—'}`
   const dias = daysUntil(c.vencimento)
-  if (dias < 0) return `Atrasada há ${Math.abs(dias)} dia(s)`
-  if (dias === 0) return 'Vence hoje'
-  return `Vence em ${dias} dia(s)`
+  const aberta = isVirtual(c) && c.faturaAberta ? ' · em aberto' : ''
+  if (dias < 0) return `Atrasada há ${Math.abs(dias)} dia${Math.abs(dias) > 1 ? 's' : ''}`
+  if (dias === 0) return `Vence hoje${aberta}`
+  if (dias === 1) return `Vence amanhã${aberta}`
+  return `Vence em ${dias} dias${aberta}`
 }
 
-export function LinhaConta({ conta, aoTocar }: { conta: ContaPagavel; aoTocar?: () => void }) {
+export function LinhaConta({
+  conta,
+  aoTocar,
+  primeira,
+  botaoPagar,
+}: {
+  conta: ContaPagavel
+  aoTocar?: () => void
+  primeira?: boolean
+  /** mostra o botão "Pagar" à direita */
+  botaoPagar?: boolean
+}) {
+  const { dinheiro } = usePreferencias()
   const pago = conta.status === 'pago'
-  const cor = pago ? cores.sucesso : conta.status === 'atrasado' ? cores.perigo : cores.aviso
-  const recorrente = isVirtual(conta) && conta.origem === 'recorrencia'
+  const dias = daysUntil(conta.vencimento)
+  const cor = pago ? cores.sucesso : conta.status === 'atrasado' ? cores.perigo : dias <= 7 ? cores.aviso : cores.texto3
+  const virtual = isVirtual(conta) ? conta : null
+  const recorrente = virtual?.origem === 'recorrencia'
+  const fatura = virtual?.origem === 'fatura'
+  const podePagar = botaoPagar && !pago && !recorrente && !virtual?.faturaAberta
   return (
-    <Pressable onPress={aoTocar} disabled={!aoTocar} style={({ pressed }) => [st.linha, pressed && { opacity: 0.7 }, pago && { opacity: 0.55 }]}>
+    <Pressable
+      onPress={aoTocar}
+      disabled={!aoTocar}
+      style={({ pressed }) => [st.linha, !primeira && st.divisor, pressed && { opacity: 0.6 }, pago && { opacity: 0.6 }]}
+    >
       <View style={st.data}>
-        <Text style={st.dataMes}>{formatDate(conta.vencimento, 'MMM')}</Text>
-        <Text style={st.dataDia}>{formatDate(conta.vencimento, 'dd')}</Text>
+        <Text style={st.dataMes}>{formatDate(conta.vencimento, 'MMM').toUpperCase()}</Text>
+        <Text style={[st.dataDia, num]}>{formatDate(conta.vencimento, 'dd')}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[st.descricao, pago && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
-          {conta.descricao}
-          {recorrente ? ' 🔁' : ''}
-        </Text>
-        <Text style={[st.sub, { color: cor }]}>{textoVencimento(conta)}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {fatura ? <Icone nome="card-outline" tamanho={15} cor={cores.texto3} /> : null}
+          <Text style={[st.descricao, { flexShrink: 1 }, pago && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
+            {conta.descricao}
+          </Text>
+          {recorrente ? <Icone nome="repeat" tamanho={14} cor={cores.texto3} /> : null}
+        </View>
+        <Text style={[st.sub, { color: cor }, !pago && cor !== cores.texto3 && f[600]]}>{textoVencimento(conta)}</Text>
       </View>
-      <Text style={[st.valor, s.num]}>{formatCurrency(Number(conta.valor))}</Text>
+      <View style={{ alignItems: 'flex-end', gap: 6 }}>
+        <Text style={[st.valor, num]}>{dinheiro(Number(conta.valor))}</Text>
+        {podePagar ? (
+          <View style={st.pagar}>
+            <Text style={st.pagarTexto}>Pagar</Text>
+          </View>
+        ) : null}
+      </View>
     </Pressable>
   )
 }
 
-export function LinhaMovimentacao({ mov, nomeCarteira, aoSegurar }: { mov: Movimentacao; nomeCarteira?: string; aoSegurar?: () => void }) {
+export function LinhaMovimentacao({
+  mov,
+  nomeCarteira,
+  recorrencia,
+  primeira,
+  aoTocar,
+}: {
+  mov: Movimentacao
+  nomeCarteira?: string
+  recorrencia?: Recorrencia
+  primeira?: boolean
+  aoTocar?: () => void
+}) {
+  const { dinheiro } = usePreferencias()
   const receita = mov.tipo === 'receita'
+  const parcela = recorrencia?.parcelas_total ? `${numeroParcela(recorrencia, mov.data)}/${recorrencia.parcelas_total}` : null
+  // o 1º lançamento já traz a parcela no nome ("Tênis (1/5)"): não repete ao lado do selo
+  const descricao = parcela ? mov.descricao.replace(/\s*\(\d+\/\d+\)$/, '') : mov.descricao
+  const corCat = mov.categoria?.cor
   return (
-    <Pressable onLongPress={aoSegurar} style={({ pressed }) => [st.linha, pressed && { opacity: 0.7 }]}>
-      <View style={[st.icone, { backgroundColor: receita ? cores.sucessoFundo : cores.sutil }]}>
-        <Text style={{ fontSize: 17 }}>{mov.categoria?.icone ?? (receita ? '💰' : '💳')}</Text>
+    <Pressable
+      onPress={aoTocar}
+      disabled={!aoTocar}
+      style={({ pressed }) => [st.linha, !primeira && st.divisor, pressed && { opacity: 0.6 }]}
+    >
+      <View style={[st.icone, { backgroundColor: receita ? cores.sucessoFundo : corCat ? `${corCat}1F` : cores.sutil }]}>
+        <Icone
+          nome={iconeCategoria(mov.categoria, receita ? 'receita' : 'despesa')}
+          tamanho={19}
+          cor={receita ? cores.sucesso : corCat ?? cores.texto2}
+        />
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={st.descricao} numberOfLines={1}>
-          {mov.descricao}
-          {mov.recorrencia_id ? ' 🔁' : ''}
-        </Text>
+      <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[st.descricao, { flexShrink: 1 }]} numberOfLines={1}>{descricao}</Text>
+          {parcela ? <Selo texto={parcela} /> : mov.recorrencia_id ? <Icone nome="repeat" tamanho={14} cor={cores.texto3} /> : null}
+        </View>
         <Text style={st.sub} numberOfLines={1}>
-          {[mov.categoria?.nome ?? 'Sem categoria', nomeCarteira, formatDate(mov.data, 'dd MMM')].filter(Boolean).join(' · ')}
+          {[mov.categoria?.nome ?? 'Sem categoria', nomeCarteira].filter(Boolean).join(' · ')}
         </Text>
       </View>
-      <Text style={[st.valor, s.num, receita && { color: cores.sucesso }]}>
+      <Text style={[st.valor, num, receita && { color: cores.sucesso }]}>
         {receita ? '+ ' : '− '}
-        {formatCurrency(Number(mov.valor))}
+        {dinheiro(Number(mov.valor))}
       </Text>
     </Pressable>
   )
 }
 
-export function BotaoNovo({ tipo = 'despesa' }: { tipo?: 'despesa' | 'receita' }) {
-  return (
-    <Pressable
-      onPress={() => router.push({ pathname: '/nova-transacao', params: { tipo } })}
-      style={({ pressed }) => [st.fab, pressed && { opacity: 0.85 }]}
-      accessibilityLabel="Nova transação"
-    >
-      <Ionicons name="add" size={30} color="#fff" />
-    </Pressable>
-  )
+/** Mini cartão colorido (cor da carteira), usado em listas e seletores. */
+export function MiniCartao({ cor, largura = 36 }: { cor: string; largura?: number }) {
+  return <View style={{ width: largura, height: Math.round(largura * 0.66), borderRadius: 6, backgroundColor: cor }} />
 }
 
 /** Janela central para pagar uma conta, pagar fatura ou ver uma recorrência. */
 export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; aoFechar: () => void }) {
-  const { carteiras, pagarFatura, marcarContaPaga } = useDados()
+  const { carteiras, pagarFatura, marcarContaPaga, receitas, despesas, pagamentosFatura } = useDados()
   const pagadoras = carteiras.filter((c) => c.tipo !== 'cartao_credito')
   const [pagadora, setPagadora] = useState('')
   const [pagando, setPagando] = useState(false)
@@ -113,6 +204,11 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
     }
   }
 
+  function irPara(destino: () => void) {
+    aoFechar()
+    destino()
+  }
+
   const titulo = aberta ? 'Fatura em aberto' : recorrencia ? 'Conta recorrente' : fatura ? 'Pagar fatura' : 'Pagar conta'
 
   return (
@@ -120,11 +216,9 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
       {conta && (
         <>
           <View style={st.resumo}>
-            <View style={{ flex: 1 }}>
-              <Text style={st.descricao}>{conta.descricao}</Text>
-              <Text style={st.sub}>Vence em {formatDate(conta.vencimento, 'dd/MM/yyyy')}</Text>
-            </View>
-            <Text style={[st.valor, s.num, { fontSize: 17 }]}>{formatCurrency(Number(conta.valor))}</Text>
+            <Text style={st.sub}>{conta.descricao}</Text>
+            <Text style={[st.resumoValor, num]}>{formatCurrency(Number(conta.valor))}</Text>
+            <Text style={st.sub}>Vence em {formatDate(conta.vencimento, "dd 'de' MMMM")}</Text>
           </View>
 
           {aberta ? (
@@ -133,35 +227,59 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
                 Esta fatura ainda recebe compras e fecha em {formatDate(virtual!.fechaEm!, 'dd/MM')}. O pagamento fica
                 disponível depois do fechamento, com o valor final.
               </Text>
-              <Botao variante="fantasma" onPress={aoFechar}>Fechar</Botao>
+              <Botao
+                icone="card-outline"
+                onPress={() => irPara(() => router.push({ pathname: '/cartao/[id]', params: { id: virtual!.cartaoId! } }))}
+              >
+                Ver fatura
+              </Botao>
             </>
           ) : recorrencia ? (
             <>
-              <Text style={st.texto}>
-                Esta despesa é lançada automaticamente na data. Para mudar valor ou pausar, use as Recorrências no site.
-              </Text>
-              <Botao variante="fantasma" onPress={aoFechar}>Fechar</Botao>
+              <Text style={st.texto}>Esta conta é lançada sozinha na data. Para mudar o valor ou pausar, use Recorrências.</Text>
+              <Botao variante="fantasma" onPress={() => irPara(() => router.push('/recorrencias'))}>
+                Abrir recorrências
+              </Botao>
             </>
           ) : (
             <>
               {fatura && (
-                <Campo
-                  rotulo="Pagar com"
-                  dica={pagadoras.length ? 'As compras já contaram como despesa na data da compra.' : 'Cadastre uma conta ou dinheiro em Carteiras.'}
-                >
-                  <Chips
-                    valor={pagadora}
-                    aoMudar={setPagadora}
-                    opcoes={[{ valor: '', rotulo: 'Sem carteira' }, ...pagadoras.map((c) => ({ valor: c.id, rotulo: `${c.icone} ${c.nome}` }))]}
-                  />
-                </Campo>
+                <View style={{ gap: 8 }}>
+                  <Text style={st.rotulo}>Pagar com</Text>
+                  {pagadoras.length === 0 ? (
+                    <Text style={st.sub}>Nenhuma conta cadastrada: o pagamento fica sem conta de origem.</Text>
+                  ) : (
+                    pagadoras.map((c) => {
+                      const ativo = c.id === pagadora
+                      return (
+                        <Pressable
+                          key={c.id}
+                          onPress={() => setPagadora(c.id)}
+                          accessibilityRole="radio"
+                          accessibilityState={{ checked: ativo }}
+                          style={[st.opcao, ativo && st.opcaoAtiva]}
+                        >
+                          <View style={[st.radio, ativo && st.radioAtivo]} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={st.descricao}>{c.nome}</Text>
+                            <Text style={st.sub}>Saldo {formatCurrency(saldoCarteira(c, receitas, despesas, pagamentosFatura))}</Text>
+                          </View>
+                        </Pressable>
+                      )
+                    })
+                  )}
+                  <View style={st.aviso}>
+                    <Icone nome="information-circle-outline" tamanho={18} cor={cores.marca} />
+                    <Text style={[st.texto, { flex: 1, fontSize: 12, lineHeight: 17 }]}>
+                      As compras já contaram como despesa na data. Pagar a fatura só tira o dinheiro da conta: nada é
+                      contado duas vezes.
+                    </Text>
+                  </View>
+                </View>
               )}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Botao variante="fantasma" onPress={aoFechar} style={{ flex: 1 }}>Cancelar</Botao>
-                <Botao onPress={confirmar} carregando={pagando} style={{ flex: 1 }}>
-                  {fatura ? 'Pagar fatura' : 'Marcar paga'}
-                </Botao>
-              </View>
+              <Botao onPress={confirmar} carregando={pagando}>
+                {fatura ? `Pagar ${formatCurrency(Number(conta.valor))}` : 'Marcar como paga'}
+              </Botao>
             </>
           )}
         </>
@@ -171,26 +289,33 @@ export function PagarConta({ conta, aoFechar }: { conta: ContaPagavel | null; ao
 }
 
 const st = StyleSheet.create({
-  linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
-  data: { width: 46, height: 46, borderRadius: 12, backgroundColor: cores.sutil, alignItems: 'center', justifyContent: 'center' },
-  dataMes: { fontSize: 9, fontWeight: '700', color: cores.texto3, textTransform: 'uppercase' },
-  dataDia: { fontSize: 16, fontWeight: '800', color: cores.texto1 },
-  icone: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  descricao: { fontSize: 15, fontWeight: '600', color: cores.texto1 },
-  sub: { fontSize: 12, color: cores.texto3, marginTop: 2 },
-  valor: { fontSize: 15, fontWeight: '700', color: cores.texto1 },
-  texto: { fontSize: 14, color: cores.texto2, lineHeight: 20 },
-  resumo: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: cores.sutil, borderRadius: raio.md, padding: 14 },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: cores.marca,
+  linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, minHeight: 60 },
+  divisor: { borderTopWidth: 1, borderTopColor: cores.sutil },
+  data: { width: 44, height: 44, borderRadius: 12, backgroundColor: cores.fundo, alignItems: 'center', justifyContent: 'center' },
+  dataMes: { fontSize: 9, ...f[700], color: cores.texto3 },
+  dataDia: { fontSize: 16, ...f[800], color: cores.texto1, marginTop: -2 },
+  icone: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  descricao: { fontSize: 14, ...f[600], color: cores.texto1 },
+  sub: { fontSize: 12, ...f[400], color: cores.texto3 },
+  valor: { fontSize: 14, ...f[700], color: cores.texto1 },
+  pagar: { backgroundColor: cores.ativoFundo, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
+  pagarTexto: { fontSize: 12, ...f[700], color: cores.marca },
+  texto: { fontSize: 14, ...f[400], color: cores.texto2, lineHeight: 20 },
+  rotulo: { fontSize: 13, ...f[600], color: cores.texto2 },
+  resumo: { alignItems: 'center', gap: 2, backgroundColor: cores.fundo, borderRadius: 16, padding: 16 },
+  resumoValor: { fontSize: 28, ...f[800], color: cores.texto1, letterSpacing: -0.6 },
+  opcao: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: cores.linha,
+    borderRadius: 14,
+    padding: 12,
+    minHeight: 56,
   },
+  opcaoAtiva: { borderColor: cores.marca, backgroundColor: cores.ativoFundo },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: cores.desligado },
+  radioAtivo: { borderColor: cores.marca, borderWidth: 6 },
+  aviso: { flexDirection: 'row', gap: 8, backgroundColor: cores.ativoFundo, borderRadius: 12, padding: 10 },
 })

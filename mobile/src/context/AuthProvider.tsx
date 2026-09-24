@@ -9,7 +9,14 @@ interface AuthCtx {
   carregando: boolean
   entrar: (email: string, senha: string) => Promise<string | null>
   entrarComGoogle: () => Promise<string | null>
+  /** devolve erro, ou `confirmar: true` quando precisa confirmar o e-mail */
+  cadastrar: (nome: string, email: string, senha: string) => Promise<{ erro: string | null; confirmar: boolean }>
+  recuperarSenha: (email: string) => Promise<string | null>
   sair: () => Promise<void>
+  /** nome para exibir (cadastro por e-mail ou conta Google) */
+  nome: string
+  /** login feito pelo Google (não tem senha) */
+  viaGoogle: boolean
 }
 
 const Ctx = createContext<AuthCtx | null>(null)
@@ -21,7 +28,8 @@ export const URL_RETORNO_LOGIN = Linking.createURL('auth-callback')
 // O Supabase aceita moneycontrol:// (liberado em Authentication → URL Configuration),
 // mas recusa exp://IP:porta mesmo liberado — e cai no site. No Expo Go o Google volta
 // para uma página ponte do site (public/app-callback.html), que repassa o código ao app.
-const PONTE = 'https://moneycontrolapp.vercel.app/app-callback.html'
+const SITE = 'https://moneycontrolapp.vercel.app'
+const PONTE = `${SITE}/app-callback.html`
 const REDIRECT_OAUTH = URL_RETORNO_LOGIN.startsWith('exp')
   ? `${PONTE}?volta=${encodeURIComponent(URL_RETORNO_LOGIN)}`
   : URL_RETORNO_LOGIN
@@ -65,11 +73,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return troca.error ? 'Não foi possível concluir o login com Google.' : null
   }
 
+  async function cadastrar(nome: string, email: string, senha: string) {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: senha,
+      // o link de confirmação abre o site; depois é só entrar no app
+      options: { data: { nome: nome.trim() }, emailRedirectTo: `${SITE}/dashboard` },
+    })
+    if (error) {
+      const jaExiste = /already|registered/i.test(error.message)
+      return { erro: jaExiste ? 'Este e-mail já tem conta. Volte e entre.' : 'Não foi possível criar a conta.', confirmar: false }
+    }
+    return { erro: null, confirmar: !data.session }
+  }
+
+  async function recuperarSenha(email: string) {
+    // a senha nova é criada no site (mesma conta do app)
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${SITE}/recuperar-senha?step=nova`,
+    })
+    return error ? 'Não foi possível enviar o link. Tente de novo em instantes.' : null
+  }
+
   async function sair() {
     await supabase.auth.signOut()
   }
 
-  return <Ctx.Provider value={{ sessao, carregando, entrar, entrarComGoogle, sair }}>{children}</Ctx.Provider>
+  const meta = sessao?.user.user_metadata ?? {}
+  const nome = String(meta.nome ?? meta.full_name ?? meta.name ?? sessao?.user.email?.split('@')[0] ?? '')
+  const viaGoogle = sessao?.user.app_metadata?.provider === 'google'
+
+  return (
+    <Ctx.Provider value={{ sessao, carregando, entrar, entrarComGoogle, cadastrar, recuperarSenha, sair, nome, viaGoogle }}>
+      {children}
+    </Ctx.Provider>
+  )
 }
 
 export function useAuth() {

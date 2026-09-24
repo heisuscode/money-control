@@ -8,13 +8,28 @@ import type {
   Categoria,
   Conta,
   ContaVirtual,
+  Meta,
   Movimentacao,
+  Notificacao,
   PagamentoFatura,
   Recorrencia,
 } from '@/lib/types'
 import { supabase } from '~/lib/supabase'
 import { agendarLembretes } from '~/lib/lembretes'
 import { useAuth } from './AuthProvider'
+import { usePreferencias } from './Preferencias'
+
+/** Campos editáveis de uma transação já lançada. */
+export interface EdicaoTransacao {
+  descricao: string
+  /** novo valor em reais; ignorado em transações feitas em moeda estrangeira */
+  valor: number
+  data: string
+  categoriaId: string | null
+  carteiraId: string | null
+}
+
+export type MetaInput = Pick<Meta, 'objetivo' | 'valor_meta' | 'valor_atual' | 'prazo' | 'icone' | 'cor'>
 
 interface DadosCtx {
   carregando: boolean
@@ -27,10 +42,20 @@ interface DadosCtx {
   recorrencias: Recorrencia[]
   pagamentosFatura: Record<string, PagamentoFatura>
   contasVirtuais: ContaVirtual[]
+  metas: Meta[]
+  notificacoes: Notificacao[]
   recarregar: () => Promise<void>
   registrarTransacao: (t: api.NovaTransacao) => Promise<void>
+  editarTransacao: (m: Movimentacao, dados: EdicaoTransacao) => Promise<void>
   excluirTransacao: (m: Movimentacao) => Promise<void>
   salvarCarteira: (dados: api.CarteiraInput, id?: string) => Promise<void>
+  removerCarteira: (id: string) => Promise<void>
+  salvarRecorrencia: (dados: api.RecorrenciaInput, id: string) => Promise<void>
+  removerRecorrencia: (id: string) => Promise<void>
+  definirOrcamento: (categoriaId: string, orcamento: number) => Promise<void>
+  salvarMeta: (dados: MetaInput, id?: string) => Promise<void>
+  removerMeta: (id: string) => Promise<void>
+  marcarNotificacoesLidas: (ids?: string[]) => Promise<void>
   pagarFatura: (cartaoId: string, fimCiclo: string, carteiraId: string | null, valor: number) => Promise<void>
   marcarContaPaga: (id: string) => Promise<void>
 }
@@ -59,20 +84,29 @@ export function DadosProvider({ children }: { children: ReactNode }) {
   const [carteiras, setCarteiras] = useState<Carteira[]>([])
   const [recorrencias, setRecorrencias] = useState<Recorrencia[]>([])
   const [pagamentos, setPagamentos] = useState<PagamentoFatura[]>([])
+  const [metas, setMetas] = useState<Meta[]>([])
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([])
+  const { lembretes } = usePreferencias()
   const lancando = useRef(false)
 
   const recarregar = useCallback(async () => {
     if (!uid) return
     try {
-      const [cats, rec, des, cts, fin] = await Promise.all([
+      const [cats, rec, des, cts, fin, mts, nts] = await Promise.all([
         supabase.from('categorias').select('*').eq('usuario_id', uid).order('nome'),
         carregarMovimentacoes(uid, 'receitas'),
         carregarMovimentacoes(uid, 'despesas'),
         supabase.from('contas').select('*').eq('usuario_id', uid).order('vencimento'),
         api.carregarFinanceiro(supabase, uid),
+        supabase.from('metas').select('*').eq('usuario_id', uid).order('criado_em', { ascending: false }),
+        supabase.from('notificacoes').select('*').eq('usuario_id', uid).order('criado_em', { ascending: false }).limit(100),
       ])
       if (cats.error) throw cats.error
       if (cts.error) throw cts.error
+      if (mts.error) throw mts.error
+      if (nts.error) throw nts.error
+      setMetas((mts.data ?? []) as Meta[])
+      setNotificacoes((nts.data ?? []) as Notificacao[])
       setCategorias((cats.data ?? []) as Categoria[])
       setReceitas(rec)
       setDespesas(des)
@@ -124,11 +158,11 @@ export function DadosProvider({ children }: { children: ReactNode }) {
     [carteiras, recorrencias, despesas, pagamentosFatura],
   )
 
-  // Lembretes locais de vencimento (1 dia antes, 9h).
+  // Lembretes locais de vencimento (padrão: 1 dia antes, 9h — ajustável em Configurações).
   useEffect(() => {
     if (carregando || erro) return
-    agendarLembretes([...contas, ...contasVirtuais]).catch((e) => console.warn('[lembretes]', e))
-  }, [carregando, erro, contas, contasVirtuais])
+    agendarLembretes([...contas, ...contasVirtuais], lembretes).catch((e) => console.warn('[lembretes]', e))
+  }, [carregando, erro, contas, contasVirtuais, lembretes])
 
   const exigirUid = () => {
     if (!uid) throw new Error('Sessão expirada. Entre novamente.')
@@ -146,9 +180,26 @@ export function DadosProvider({ children }: { children: ReactNode }) {
     recorrencias,
     pagamentosFatura,
     contasVirtuais,
+    metas,
+    notificacoes,
     recarregar,
     registrarTransacao: async (t) => {
       await api.registrarTransacao(supabase, exigirUid(), t)
+      await recarregar()
+    },
+    editarTransacao: async (m, e) => {
+      const emReais = (m.moeda_original ?? 'BRL') === 'BRL'
+      const { error } = await supabase
+        .from(m.tipo === 'receita' ? 'receitas' : 'despesas')
+        .update({
+          descricao: e.descricao,
+          data: e.data,
+          categoria_id: e.categoriaId,
+          carteira_id: e.carteiraId,
+          ...(emReais ? { valor: e.valor, valor_convertido: e.valor, valor_original: e.valor } : {}),
+        })
+        .eq('id', m.id)
+      if (error) throw error
       await recarregar()
     },
     excluirTransacao: async (m) => {
@@ -159,6 +210,45 @@ export function DadosProvider({ children }: { children: ReactNode }) {
     salvarCarteira: async (dados, id) => {
       await api.salvarCarteira(supabase, exigirUid(), dados, id)
       await recarregar()
+    },
+    removerCarteira: async (id) => {
+      await api.removerCarteira(supabase, id)
+      await recarregar()
+    },
+    salvarRecorrencia: async (dados, id) => {
+      await api.salvarRecorrencia(supabase, exigirUid(), dados, id)
+      await recarregar()
+    },
+    removerRecorrencia: async (id) => {
+      await api.removerRecorrencia(supabase, id)
+      await recarregar()
+    },
+    definirOrcamento: async (categoriaId, orcamento) => {
+      const { error } = await supabase.from('categorias').update({ orcamento }).eq('id', categoriaId)
+      if (error) throw error
+      await recarregar()
+    },
+    salvarMeta: async (dados, id) => {
+      const { error } = id
+        ? await supabase.from('metas').update(dados).eq('id', id)
+        : await supabase.from('metas').insert({ ...dados, usuario_id: exigirUid() })
+      if (error) throw error
+      await recarregar()
+    },
+    removerMeta: async (id) => {
+      const { error } = await supabase.from('metas').delete().eq('id', id)
+      if (error) throw error
+      await recarregar()
+    },
+    marcarNotificacoesLidas: async (ids) => {
+      const alvo = ids ?? notificacoes.filter((n) => !n.lida).map((n) => n.id)
+      if (!alvo.length) return
+      setNotificacoes((atual) => atual.map((n) => (alvo.includes(n.id) ? { ...n, lida: true } : n)))
+      const { error } = await supabase.from('notificacoes').update({ lida: true }).in('id', alvo)
+      if (error) {
+        await recarregar()
+        throw error
+      }
     },
     pagarFatura: async (cartaoId, fimCiclo, carteiraId, valor) => {
       await api.pagarFatura(supabase, exigirUid(), cartaoId, fimCiclo, carteiraId, valor)
